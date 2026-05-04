@@ -31,19 +31,15 @@ BEGIN
 
     IN_RADDR <= RESIZE(s_idx, ABUS_t'LENGTH);
 
-    PROCESS(CLK, RST)
+    -- Control: FSM de estados y señales de handshake (START/READY)
+    P_CONTROL : PROCESS(CLK, RST)
     BEGIN
         IF RST = '1' THEN
-            s_state    <= ST_IDLE;
-            s_idx      <= (OTHERS => '0');
-            OUT_WE     <= '0';
-            OUT_WADDR  <= (OTHERS => '0');
-            OUT_WDATA  <= (OTHERS => '0');
-            READY      <= '0';
+            s_state <= ST_IDLE;
+            s_idx   <= (OTHERS => '0');
+            READY   <= '0';
         ELSIF RISING_EDGE(CLK) THEN
-            OUT_WE <= '0';
-            READY  <= '0';
-
+            READY <= '0';
             CASE s_state IS
                 WHEN ST_IDLE =>
                     IF START = '1' THEN
@@ -52,10 +48,6 @@ BEGIN
                     END IF;
 
                 WHEN ST_RUN =>
-                    OUT_WE    <= '1';
-                    OUT_WADDR <= RESIZE(s_idx, ABUS_t'LENGTH);
-                    OUT_WDATA <= IN_RDATA;
-
                     IF s_idx >= N_PARTS THEN
                         READY   <= '1';
                         s_state <= ST_IDLE;
@@ -64,5 +56,23 @@ BEGIN
                     END IF;
             END CASE;
         END IF;
-    END PROCESS;
+    END PROCESS P_CONTROL;
+
+    -- Interfaz de memoria: puerto de escritura en memoria de salida
+    P_MEM_IF : PROCESS(CLK, RST)
+    BEGIN
+        IF RST = '1' THEN
+            OUT_WE    <= '0';
+            OUT_WADDR <= (OTHERS => '0');
+            OUT_WDATA <= (OTHERS => '0');
+        ELSIF RISING_EDGE(CLK) THEN
+            OUT_WE <= '0';
+            IF s_state = ST_RUN THEN
+                OUT_WE    <= '1';
+                OUT_WADDR <= RESIZE(s_idx, ABUS_t'LENGTH);
+                OUT_WDATA <= IN_RDATA;
+            END IF;
+        END IF;
+    END PROCESS P_MEM_IF;
+
 END ARCHITECTURE RTL;

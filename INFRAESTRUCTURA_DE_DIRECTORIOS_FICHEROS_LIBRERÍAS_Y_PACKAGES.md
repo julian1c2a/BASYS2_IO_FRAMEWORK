@@ -54,21 +54,24 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 
 ## `GENERAL.MEMORY_TYPES` (`MEMORY_TYPES.vhd`)
 
-**Propósito:** centralizar el ancho de buses y el tipo de memoria de bytes usado por la operación.
+**Propósito:** centralizar el ancho de buses de dirección y datos, y el tipo de memoria de bytes usado por las memorias del sistema.
 
 ### Qué declara
 
 - Constantes de parametrización:
-  - `C_DBUS_WIDTH = 8`
-  - `C_ABUS_WIDTH = 8`
+  - `C_DBUS_WIDTH = 8` — ancho del bus de datos en bits.
+  - `C_ABUS_WIDTH = 8` — ancho del bus de direcciones en bits.
   - `C_DBUS_MSB = C_DBUS_WIDTH - 1`
   - `C_ABUS_MSB = C_ABUS_WIDTH - 1`
-- `TYPE MEMORY_T`: array indexado por dirección (`C_ABUS_MSB downto 0`) de palabras `UNSIGNED(C_DBUS_MSB downto 0)`.
+- `SUBTYPE DBUS_t IS UNSIGNED(C_DBUS_MSB DOWNTO 0)` — tipo del bus de datos.
+- `SUBTYPE ABUS_t IS UNSIGNED(C_ABUS_MSB DOWNTO 0)` — tipo del bus de direcciones.
+- `TYPE MEMORY_T IS ARRAY(C_ABUS_MSB DOWNTO 0) OF DBUS_t` — array de 8 palabras de 8 bits.
 
 ### Dónde se usa
 
-- `OP_IDENTIDAD.vhdl`: puertos `DATA_IN` y `DATA_OUT`.
-- `TOP.vhdl`: buffers `s_in_buffer` y `s_out_buffer`.
+- `MEMORY.vhdl`: puertos `WADDR`, `RADDR0`, `RADDR1` (tipo `ABUS_t`); `WDATA`, `RDATA0`, `RDATA1` (tipo `DBUS_t`).
+- `OP_IDENTIDAD.vhdl`: puertos de interfaz con las memorias (`IN_RADDR`, `IN_RDATA`, `OUT_WADDR`, `OUT_WDATA`).
+- `TOP.vhdl`: todas las señales de interconexión entre módulos de memoria y operación.
 
 > Nota: la estructura representa memoria de 8 posiciones × 8 bits (según constantes actuales).
 
@@ -123,8 +126,9 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 
 - `D7S_Drivers.vhdl` ⟶ usa `D7S.D7S_UTILITIES`.
 - `GEN_IO_CLK.vhdl` ⟶ usa `GENERAL.UTILITIES`.
-- `OP_IDENTIDAD.vhdl` ⟶ usa `GENERAL.MEMORY_TYPES`.
-- `TOP.vhdl` ⟶ usa `D7S.D7S_UTILITIES`, `GENERAL.MEMORY_TYPES` y utilidades de concatenación.
+- `MEMORY.vhdl` ⟶ usa `GENERAL.MEMORY_TYPES` (`DBUS_t`, `ABUS_t`, `MEMORY_T`).
+- `OP_IDENTIDAD.vhdl` ⟶ usa `GENERAL.MEMORY_TYPES` (`DBUS_t`, `ABUS_t`).
+- `TOP.vhdl` ⟶ usa `D7S.D7S_UTILITIES`, `GENERAL.MEMORY_TYPES` y `UTILITIES.UTILITIES.CONCAT`.
 - `tb_clog2.vhdl` ⟶ prueba `CLOG2` de `UTILITIES`.
 
 ---
@@ -132,29 +136,52 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 ## 4) Ficheros fuente principales (no generados)
 
 - `BASYS2_IO_FRAMEWORK.ucf`: mapeo de pines de la BASYS2.
-- `TOP.vhdl`: integración principal (FSM, entrada/salida, instancias de módulos).
-- `OP_IDENTIDAD.vhdl`: operación actual (copia entrada→salida al activar `START`).
-- `MEMORY.vhdl`: módulo de memoria dedicado con escritura por dirección y lectura por dirección.
-- `OP_IDENTIDAD.vhdl`: operación actual (identidad) usando interfaz de memoria por dirección/dato.
+- `TOP.vhdl`: integración principal (FSM, entrada/salida, dos instancias de `MEMORY`, una de `OP_IDENTITY` y una de `DISPLAY_CTRL`).
+- `MEMORY.vhdl`: módulo de memoria RAM síncrona con 1 puerto de escritura y 2 de lectura asíncrona; puertos tipados con `ABUS_t`/`DBUS_t`.
+- `OP_IDENTIDAD.vhdl`: operación identidad — copia byte a byte de la memoria de entrada a la de salida mediante interfaz de dirección/dato; arquitectura separada en dos procesos síncronos (`P_CONTROL` y `P_MEM_IF`).
 - `GEN_IO_CLK.vhdl`: divisor/generador de reloj de E/S parametrizable.
 - `D7S_Drivers.vhdl`: controlador multiplexado de 4 displays 7-seg.
 - `D7S_Utilities.vhdl`: package de tipos/decodificación 7-seg.
-- `MEMORY_TYPES.vhd`: package de tipos/anchos de memoria.
+- `MEMORY_TYPES.vhd`: package de tipos/anchos de memoria (`DBUS_t`, `ABUS_t`, `MEMORY_T`).
 - `UTILITIES.vhdl`: package de funciones auxiliares (`CLOG2`, conversión, concatenación).
 - `SYSTEM_CONSTANTS.vhdl`: package de constantes de temporización.
 - `tb_clog2.vhdl`: banco de pruebas para `CLOG2`.
 
 ---
 
-## 5) Observaciones prácticas
+## 5) Arquitectura de la operación (`OP_IDENTIDAD.vhdl`)
+
+La entidad `OP_IDENTITY` implementa la operación identidad mediante dos procesos síncronos independientes:
+
+| Proceso     | Señales conducidas                 | Responsabilidad                                      |
+| ----------- | ---------------------------------- | ---------------------------------------------------- |
+| `P_CONTROL` | `s_state`, `s_idx`, `READY`        | FSM de control y handshake `START`/`READY`           |
+| `P_MEM_IF`  | `OUT_WE`, `OUT_WADDR`, `OUT_WDATA` | Escritura byte a byte en memoria de salida           |
+| Concurrente | `IN_RADDR`                         | Selección de dirección de lectura en memoria entrada |
+
+El flujo completo de datos es:
+
+```text
+TOP (ST_IN) ──► [INPUT_MEMORY] ──► OP_IDENTITY (ST_OP) ──► [OUTPUT_MEMORY] ──► TOP (ST_OUT) ──► Display
+   escribe           lee             lee / escribe              lee
+```
+
+- TOP nunca escribe directamente en la operación; le pasa datos a través de `IN_MEMORY_MODULE`.
+- La operación devuelve resultados a través de `OUT_MEMORY_MODULE`.
+- TOP lee la memoria de salida para construir la ventana de visualización.
+
+---
+
+## 6) Observaciones prácticas
 
 - Los ficheros `TOP_*`, `netgen/*`, `*.xrpt`, `*.ncd`, `*.bit`, etc. son artefactos de implementación/síntesis.
 - Para mantenimiento del diseño, céntrate en los ficheros fuente listados arriba y en estos cuatro packages.
 - El fichero del package de display se llama **`D7S_Utilities.vhdl`** y el package interno se llama `D7S_UTILITIES`.
+- Los subtipos `DBUS_t` y `ABUS_t` deben usarse en todos los puertos de memoria nuevos para mantener consistencia de tipos.
 
 ---
 
-## 6) Orden de compilación recomendado (ISE/GHDL)
+## 7) Orden de compilación recomendado (ISE/GHDL)
 
 Para evitar errores de dependencias, compila de **paquetes base** a **entidades consumidoras**.
 

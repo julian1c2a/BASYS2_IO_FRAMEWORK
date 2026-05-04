@@ -1,0 +1,14 @@
+# Ignorar todo por defecto
+*
+
+# Permitir recorrer directorios
+!*/
+
+# Mantener este archivo versionado
+!.gitignore
+
+# Únicas extensiones permitidas
+!*.ucf
+!*.vhd
+!*.vhdl
+!*.md

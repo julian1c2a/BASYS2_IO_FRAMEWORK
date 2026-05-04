@@ -9,9 +9,8 @@ LIBRARY D7S;
 USE D7S.D7S_UTILITIES.ALL;
 
 LIBRARY GENERAL;
-USE GENERAL.MEMORY_TYPES.C_DBUS_MSB;
-USE GENERAL.MEMORY_TYPES.C_ABUS_MSB;
-USE GENERAL.MEMORY_TYPES.C_ABUS_WIDTH;
+USE GENERAL.MEMORY_TYPES.DBUS_t;
+USE GENERAL.MEMORY_TYPES.ABUS_t;
 
 LIBRARY UTILITIES;
 USE UTILITIES.UTILITIES.CONCAT;
@@ -48,11 +47,11 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_in_mem_clr,  s_in_mem_we  : STD_LOGIC;
     SIGNAL s_out_mem_clr, s_out_mem_we : STD_LOGIC;
 
-    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0,  s_in_mem_raddr1  : UNSIGNED(C_ABUS_MSB DOWNTO 0);
-    SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : UNSIGNED(C_ABUS_MSB DOWNTO 0);
+    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0,  s_in_mem_raddr1  : ABUS_t;
+    SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : ABUS_t;
 
-    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0,  s_in_mem_rdata1  : UNSIGNED(C_DBUS_MSB DOWNTO 0);
-    SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : UNSIGNED(C_DBUS_MSB DOWNTO 0);
+    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0,  s_in_mem_rdata1  : DBUS_t;
+    SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Registros de Control
     SIGNAL s_n_parts  : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7
@@ -143,7 +142,7 @@ BEGIN
                     LED(3 DOWNTO 0) <= "0010";
                     IF s_btn_valid = '1' THEN
                         s_in_mem_we    <= '1';
-                        s_in_mem_waddr <= RESIZE(s_byte_cnt, C_ABUS_WIDTH);
+                        s_in_mem_waddr <= RESIZE(s_byte_cnt, ABUS_t'LENGTH);
                         s_in_mem_wdata <= UNSIGNED(SW);
                         
                         IF s_byte_cnt >= s_n_parts THEN
@@ -177,17 +176,17 @@ BEGIN
     BEGIN
         CASE SW(1 DOWNTO 0) IS
             WHEN "00" =>
-                s_out_mem_raddr1 <= TO_UNSIGNED(1, C_ABUS_WIDTH);
-                s_out_mem_raddr0 <= TO_UNSIGNED(0, C_ABUS_WIDTH);
+                s_out_mem_raddr1 <= TO_UNSIGNED(1, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(0, ABUS_t'LENGTH);
             WHEN "01" =>
-                s_out_mem_raddr1 <= TO_UNSIGNED(3, C_ABUS_WIDTH);
-                s_out_mem_raddr0 <= TO_UNSIGNED(2, C_ABUS_WIDTH);
+                s_out_mem_raddr1 <= TO_UNSIGNED(3, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(2, ABUS_t'LENGTH);
             WHEN "10" =>
-                s_out_mem_raddr1 <= TO_UNSIGNED(5, C_ABUS_WIDTH);
-                s_out_mem_raddr0 <= TO_UNSIGNED(4, C_ABUS_WIDTH);
+                s_out_mem_raddr1 <= TO_UNSIGNED(5, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(4, ABUS_t'LENGTH);
             WHEN "11" =>
-                s_out_mem_raddr1 <= TO_UNSIGNED(7, C_ABUS_WIDTH);
-                s_out_mem_raddr0 <= TO_UNSIGNED(6, C_ABUS_WIDTH);
+                s_out_mem_raddr1 <= TO_UNSIGNED(7, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(6, ABUS_t'LENGTH);
             WHEN OTHERS =>
                 s_out_mem_raddr1 <= (OTHERS => '0');
                 s_out_mem_raddr0 <= (OTHERS => '0');

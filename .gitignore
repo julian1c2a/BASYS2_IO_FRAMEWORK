@@ -6,6 +6,7 @@
 
 # Mantener este archivo versionado
 !.gitignore
+!.gitattributes
 
 # Únicas extensiones permitidas
 !*.ucf

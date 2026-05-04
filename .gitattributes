@@ -1,0 +1,23 @@
+# Normalización de finales de línea
+* text=auto
+
+# Forzar LF en fuentes y documentación
+*.vhd text eol=lf
+*.vhdl text eol=lf
+*.md text eol=lf
+*.ucf text eol=lf
+
+# Scripts de PowerShell en CRLF (convención Windows)
+*.ps1 text eol=crlf
+
+# Archivos binarios comunes de FPGA/ISE
+*.bit binary
+*.ncd binary
+*.ngc binary
+*.ngd binary
+*.par binary
+*.twx binary
+*.twr binary
+*.xpi binary
+*.xls binary
+*.pdf binary

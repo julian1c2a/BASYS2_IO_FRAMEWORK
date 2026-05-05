@@ -13,7 +13,7 @@ USE GENERAL.MEMORY_TYPES.DBUS_t;
 USE GENERAL.MEMORY_TYPES.ABUS_t;
 
 LIBRARY UTILITIES;
-USE UTILITIES.UTILITIES.ALL;
+USE UTILITIES.UTILITIES.CONCAT;
 
 ENTITY TOP IS
     PORT (
@@ -32,26 +32,20 @@ ARCHITECTURE RTL OF TOP IS
     TYPE fsm_state_t IS (ST_IDLE, ST_IN, ST_OP, ST_OUT);
     SIGNAL s_state : fsm_state_t;
 
-    -- Parámetros de ticks (sistema síncrono con reloj único)
-    CONSTANT C_IDX_500HZ : NATURAL := 0;
-    CONSTANT C_IDX_2HZ   : NATURAL := 1;
-    CONSTANT C_TICK_PERIODS : POSITIVE_VECTOR_t(0 TO 1) := (50000, 12500000);
+    -- Parámetros de ticks (compatibles con ISE VHDL-93)
+    -- Base común = GCD(50000, 12500000) = 50000
+    CONSTANT C_BASE_CNT : NATURAL := 50000;
+    CONSTANT C_DIV_2HZ  : NATURAL := 250; -- 12500000 / 50000
 
-    CONSTANT C_BASE_CNT  : POSITIVE := GCD_ARRAY(C_TICK_PERIODS);
-    CONSTANT C_TICK_DIVS : POSITIVE_VECTOR_t(C_TICK_PERIODS'RANGE) := DIV_ARRAY(C_TICK_PERIODS, C_BASE_CNT);
-    CONSTANT C_MAX_DIV   : POSITIVE := MAX_IN_ARRAY(C_TICK_DIVS);
-
-    CONSTANT C_BASE_W    : POSITIVE := CLOG2(C_BASE_CNT);
-    CONSTANT C_DIV_W     : POSITIVE := CLOG2(C_MAX_DIV);
+    CONSTANT C_BASE_W : NATURAL := 16; -- CLOG2(50000)
+    CONSTANT C_DIV2_W : NATURAL := 8;  -- CLOG2(250)
 
     -- Señales de ticks
     SIGNAL s_tick_500, s_tick_2 : STD_LOGIC;
-	 SIGNAL s_ticks : STD_LOGIC_VECTOR(C_TICK_PERIODS'RANGE);
 
     -- Contadores del motor de ticks común
     SIGNAL s_base_counter : UNSIGNED(C_BASE_W-1 DOWNTO 0);
-    TYPE tick_counter_array_t IS ARRAY (C_TICK_PERIODS'RANGE) OF UNSIGNED(C_DIV_W-1 DOWNTO 0);
-    SIGNAL s_tick_counters : tick_counter_array_t;
+    SIGNAL s_div2_counter : UNSIGNED(C_DIV2_W-1 DOWNTO 0);
 
     -- Señales de Botones (Debouncing a 2 Hz)
     SIGNAL s_btn_any, s_btn_sampled, s_btn_valid : STD_LOGIC;
@@ -85,28 +79,26 @@ BEGIN
     s_btn_any <= BTN(0) OR BTN(1) OR BTN(2);
 
     PROCESS(CLK, RST) IS
-        VARIABLE v_tick_base : BOOLEAN;
+        VARIABLE v_tick_base  : BOOLEAN;
         VARIABLE v_tick_2_evt : BOOLEAN;
     BEGIN
         IF RST = '1' THEN
             s_base_counter <= (OTHERS => '0');
-            FOR I IN C_TICK_PERIODS'RANGE LOOP
-                s_tick_counters(I) <= (OTHERS => '0');
-                s_ticks(I) <= '0';
-            END LOOP;
+            s_div2_counter <= (OTHERS => '0');
+            s_tick_500 <= '0';
+            s_tick_2   <= '0';
             s_btn_sampled <= '0';
             s_btn_valid <= '0';
         ELSIF RISING_EDGE(CLK) THEN
             v_tick_base := FALSE;
             v_tick_2_evt := FALSE;
 
-            FOR I IN C_TICK_PERIODS'RANGE LOOP
-                s_ticks(I) <= '0';
-            END LOOP;
+            s_tick_500 <= '0';
+            s_tick_2   <= '0';
             s_btn_valid <= '0';
 
             -- Tick base cada C_BASE_CNT ciclos de reloj
-            IF s_base_counter = TO_UNSIGNED(C_BASE_CNT-1, C_BASE_W) THEN
+            IF s_base_counter = TO_UNSIGNED(C_BASE_CNT - 1, C_BASE_W) THEN
                 s_base_counter <= (OTHERS => '0');
                 v_tick_base := TRUE;
             ELSE
@@ -114,17 +106,17 @@ BEGIN
             END IF;
 
             IF v_tick_base THEN
-                FOR I IN C_TICK_PERIODS'RANGE LOOP
-                    IF s_tick_counters(I) = TO_UNSIGNED(C_TICK_DIVS(I)-1, C_DIV_W) THEN
-                        s_tick_counters(I) <= (OTHERS => '0');
-                        s_ticks(I) <= '1';
-                        IF I = C_IDX_2HZ THEN
-                            v_tick_2_evt := TRUE;
-                        END IF;
-                    ELSE
-                        s_tick_counters(I) <= s_tick_counters(I) + 1;
-                    END IF;
-                END LOOP;
+                -- 500 Hz: un pulso por cada tick base
+                s_tick_500 <= '1';
+
+                -- 2 Hz: un pulso cada 250 ticks base
+                IF s_div2_counter = TO_UNSIGNED(C_DIV_2HZ - 1, C_DIV2_W) THEN
+                    s_div2_counter <= (OTHERS => '0');
+                    s_tick_2 <= '1';
+                    v_tick_2_evt := TRUE;
+                ELSE
+                    s_div2_counter <= s_div2_counter + 1;
+                END IF;
             END IF;
 
             IF v_tick_2_evt THEN
@@ -136,9 +128,6 @@ BEGIN
             END IF;
         END IF;
     END PROCESS;
-
-    s_tick_500 <= s_ticks(C_IDX_500HZ);
-    s_tick_2   <= s_ticks(C_IDX_2HZ);
 
 
     -- 2. MÁQUINA DE ESTADOS FINITOS (FSM)

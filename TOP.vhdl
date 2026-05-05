@@ -131,8 +131,6 @@ BEGIN
                 s_tick_counters(I) <= (OTHERS => '0');
                 s_ticks(I) <= '0';
             END LOOP;
-            s_tick_500 <= '0';
-            s_tick_2   <= '0';
             s_btn_sampled <= '0';
             s_btn_valid <= '0';
         ELSIF RISING_EDGE(CLK) THEN

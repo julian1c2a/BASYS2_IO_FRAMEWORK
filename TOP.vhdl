@@ -95,20 +95,25 @@ ARCHITECTURE RTL OF TOP IS
 
     -- Señales de la Operación
     SIGNAL s_start, s_ready : STD_LOGIC;
+    SIGNAL s_mode    : STD_LOGIC_VECTOR(1 DOWNTO 0);
+    SIGNAL s_op_code : STD_LOGIC_VECTOR(3 DOWNTO 0);
+    SIGNAL s_imm     : DBUS_t;
+    SIGNAL s_src_addr_a, s_src_addr_b, s_dst_addr : ABUS_t;
+    SIGNAL s_acc_debug : UNSIGNED(63 DOWNTO 0);
 
     -- Señales de memorias (entrada y salida separadas)
     SIGNAL s_in_mem_clr,  s_in_mem_we  : STD_LOGIC;
     SIGNAL s_out_mem_clr, s_out_mem_we : STD_LOGIC;
 
-    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0  : ABUS_t;
+    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0, s_in_mem_raddr1  : ABUS_t;
     SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : ABUS_t;
 
-    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0, s_in_mem_rdata1_nc : DBUS_t;
+    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0, s_in_mem_rdata1 : DBUS_t;
     SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Registros de Control
-    SIGNAL s_n_parts  : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7 (from switches)
-    SIGNAL s_byte_cnt : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7 (from switches)
+    SIGNAL s_n_parts  : ABUS_t;-- 4 bits allows us choose from 0 to 15 (from switches)
+    SIGNAL s_byte_cnt : ABUS_t;-- 4 bits allows us choose from 0 to 15 (from switches)
     
     -- Señales para el Display
     SIGNAL s_window       : STD_LOGIC_VECTOR(15 DOWNTO 0);-- Parte visible de la salida
@@ -188,6 +193,12 @@ BEGIN
             s_byte_cnt   <= (OTHERS => '0');
             s_n_parts    <= (OTHERS => '0');
             s_start      <= '0';
+                s_mode       <= "10"; -- modo verbal por defecto en esta integración
+                s_op_code    <= (OTHERS => '0');
+                s_imm        <= (OTHERS => '0');
+                s_src_addr_a <= (OTHERS => '0');
+                s_src_addr_b <= TO_UNSIGNED(8, ABUS_t'LENGTH);
+                s_dst_addr   <= (OTHERS => '0');
             s_in_mem_clr <= '0';
             s_in_mem_we  <= '0';
             s_out_mem_clr<= '0';
@@ -207,8 +218,14 @@ BEGIN
                     LED(3 DOWNTO 0) <= "0001";
                     IF s_btn_valid = '1' THEN
                         s_state    <= ST_IN;-- PASAMOS AL ESTADO ENTRADA DE DATOS
-                        s_n_parts  <= UNSIGNED(SW(2 DOWNTO 0));-- NÚMERO DE BYTES DE ENTRADA
-                        s_byte_cnt <= "000";
+                        s_n_parts  <= UNSIGNED(SW(3 DOWNTO 0));-- NÚMERO DE BYTES DE ENTRADA
+                        s_op_code  <= SW(7 DOWNTO 4); -- opcode latched al iniciar la sesión
+                        s_mode     <= "10"; -- operación verbal (lectura/escritura se añadirán en la FSM siguiente)
+                        s_imm      <= (OTHERS => '0'); -- placeholder hasta añadir fase explícita de configuración IMM
+                        s_src_addr_a <= (OTHERS => '0');
+                        s_src_addr_b <= TO_UNSIGNED(8, ABUS_t'LENGTH);
+                        s_dst_addr   <= (OTHERS => '0');
+                        s_byte_cnt <= (OTHERS => '0');
                         s_in_mem_clr  <= '1';
                         s_out_mem_clr <= '1';
                     END IF;
@@ -217,7 +234,7 @@ BEGIN
                     LED(3 DOWNTO 0) <= "0010";
                     IF s_btn_valid = '1' THEN
                         s_in_mem_we    <= '1';-- SEÑAL QUE PERMITE ESCRIBIR EN LA MEMORIA
-                        s_in_mem_waddr <= RESIZE(s_byte_cnt, ABUS_t'LENGTH);-- DIRECCIÓN DE ESCRITURA
+                        s_in_mem_waddr <= s_byte_cnt;-- DIRECCIÓN DE ESCRITURA
                         s_in_mem_wdata <= UNSIGNED(SW);-- DATO DE ENTRADA DE ESCRITURA DESDE SWITCHES
                         
                         IF s_byte_cnt >= s_n_parts THEN
@@ -246,24 +263,36 @@ BEGIN
 		  
     END PROCESS;
     
-    LED(7 DOWNTO 4) <= STD_LOGIC_VECTOR(s_byte_cnt) & '0'; -- Opcional: ver el progreso del contador
+    LED(7 DOWNTO 4) <= STD_LOGIC_VECTOR(s_byte_cnt); -- Opcional: ver el progreso del contador
 
     -- 3. SISTEMA DE VENTANAS DE SALIDA
-    PROCESS(SW(1 DOWNTO 0))
+    PROCESS(SW(2 DOWNTO 0))
     BEGIN
-        CASE SW(1 DOWNTO 0) IS
-            WHEN "00" =>
+        CASE SW(2 DOWNTO 0) IS
+            WHEN "000" =>
                 s_out_mem_raddr1 <= TO_UNSIGNED(1, ABUS_t'LENGTH);
                 s_out_mem_raddr0 <= TO_UNSIGNED(0, ABUS_t'LENGTH);
-            WHEN "01" =>
+            WHEN "001" =>
                 s_out_mem_raddr1 <= TO_UNSIGNED(3, ABUS_t'LENGTH);
                 s_out_mem_raddr0 <= TO_UNSIGNED(2, ABUS_t'LENGTH);
-            WHEN "10" =>
+            WHEN "010" =>
                 s_out_mem_raddr1 <= TO_UNSIGNED(5, ABUS_t'LENGTH);
                 s_out_mem_raddr0 <= TO_UNSIGNED(4, ABUS_t'LENGTH);
-            WHEN "11" =>
+            WHEN "011" =>
                 s_out_mem_raddr1 <= TO_UNSIGNED(7, ABUS_t'LENGTH);
                 s_out_mem_raddr0 <= TO_UNSIGNED(6, ABUS_t'LENGTH);
+            WHEN "100" =>
+                s_out_mem_raddr1 <= TO_UNSIGNED(9, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(8, ABUS_t'LENGTH);
+            WHEN "101" =>
+                s_out_mem_raddr1 <= TO_UNSIGNED(11, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(10, ABUS_t'LENGTH);
+            WHEN "110" =>
+                s_out_mem_raddr1 <= TO_UNSIGNED(13, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(12, ABUS_t'LENGTH);
+            WHEN "111" =>
+                s_out_mem_raddr1 <= TO_UNSIGNED(15, ABUS_t'LENGTH);
+                s_out_mem_raddr0 <= TO_UNSIGNED(14, ABUS_t'LENGTH);
             WHEN OTHERS =>
                 s_out_mem_raddr1 <= (OTHERS => '0');
                 s_out_mem_raddr0 <= (OTHERS => '0');
@@ -290,8 +319,8 @@ BEGIN
             WDATA  => s_in_mem_wdata,
             RADDR0 => s_in_mem_raddr0,
             RDATA0 => s_in_mem_rdata0,
-            RADDR1 => (OTHERS => '0'),
-            RDATA1 => s_in_mem_rdata1_nc -- NO CONECTADO
+            RADDR1 => s_in_mem_raddr1,
+            RDATA1 => s_in_mem_rdata1
         );
 
     OUT_MEMORY_MODULE : ENTITY WORK.MEMORY
@@ -308,18 +337,27 @@ BEGIN
             RDATA1 => s_out_mem_rdata1
         );
 
-    OP_MODULE : ENTITY WORK.OP_IDENTITY
+    OP_MODULE : ENTITY WORK.OP_SELECTOR
         PORT MAP (
-            CLK       => CLK,
-            RST       => RST,
-            START     => s_start,
-            N_PARTS   => s_n_parts,
-            IN_RADDR  => s_in_mem_raddr0,
-            IN_RDATA  => s_in_mem_rdata0,
-            OUT_WE    => s_out_mem_we,
-            OUT_WADDR => s_out_mem_waddr,
-            OUT_WDATA => s_out_mem_wdata,
-            READY     => s_ready
+            CLK        => CLK,
+            RST        => RST,
+            START      => s_start,
+            MODE       => s_mode,
+            OP_CODE    => s_op_code,
+            N_PARTS    => s_n_parts,
+            IMM        => s_imm,
+            SRC_ADDR_A => s_src_addr_a,
+            SRC_ADDR_B => s_src_addr_b,
+            DST_ADDR   => s_dst_addr,
+            IN_RADDR0  => s_in_mem_raddr0,
+            IN_RDATA0  => s_in_mem_rdata0,
+            IN_RADDR1  => s_in_mem_raddr1,
+            IN_RDATA1  => s_in_mem_rdata1,
+            OUT_WE     => s_out_mem_we,
+            OUT_WADDR  => s_out_mem_waddr,
+            OUT_WDATA  => s_out_mem_wdata,
+            READY      => s_ready,
+            ACC_DEBUG  => s_acc_debug
         );
 
     DISPLAY_MODULE : ENTITY D7S.DISPLAY_CTRL

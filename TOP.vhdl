@@ -50,7 +50,7 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_in_mem_waddr,  s_in_mem_raddr0  : ABUS_t;
     SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : ABUS_t;
 
-    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0  : DBUS_t;
+    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0, s_in_mem_rdata1_nc : DBUS_t;
     SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Registros de Control
@@ -212,7 +212,7 @@ BEGIN
             RADDR0 => s_in_mem_raddr0,
             RDATA0 => s_in_mem_rdata0,
             RADDR1 => (OTHERS => '0'),
-            RDATA1 => OPEN
+            RDATA1 => s_in_mem_rdata1_nc
         );
 
     OUT_MEMORY_MODULE : ENTITY WORK.MEMORY

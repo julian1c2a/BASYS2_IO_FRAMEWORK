@@ -12,14 +12,14 @@ ENTITY OP_IDENTITY IS
     PORT (
         SIGNAL CLK       : IN  STD_LOGIC;
         SIGNAL RST       : IN  STD_LOGIC;
-        SIGNAL START     : IN  STD_LOGIC;
-        SIGNAL N_PARTS   : IN  UNSIGNED(2 DOWNTO 0);
-        SIGNAL IN_RADDR  : OUT ABUS_t;
-        SIGNAL IN_RDATA  : IN  DBUS_t;
-        SIGNAL OUT_WE    : OUT STD_LOGIC;
-        SIGNAL OUT_WADDR : OUT ABUS_t;
-        SIGNAL OUT_WDATA : OUT DBUS_t;
-        SIGNAL READY     : OUT STD_LOGIC
+        SIGNAL START     : IN  STD_LOGIC; -- SEÑAL DE COMIENZO DE OPERACIÓN
+        SIGNAL N_PARTS   : IN  UNSIGNED(2 DOWNTO 0);-- CUÁNTOS BYTES SE HAN INTRODUCIDO
+        SIGNAL IN_RADDR  : OUT ABUS_t;-- DIRECCIÓN DE DATO QUE LLEGA DESDE MEMORIA
+        SIGNAL IN_RDATA  : IN  DBUS_t;-- DATO QUE LLEGA DESDE MEMORIA
+        SIGNAL OUT_WE    : OUT STD_LOGIC; -- SEÑAL PARA PERMITIR ESCRITURA EN MEMORIA
+        SIGNAL OUT_WADDR : OUT ABUS_t; -- DIRECCIÓN DE DATO DE ESCRITURA QUE PRODUCE LA OPERACIÓN
+        SIGNAL OUT_WDATA : OUT DBUS_t; -- DATO DE ESCRITURA QUE PRODUCE LA OPERACIÓN
+        SIGNAL READY     : OUT STD_LOGIC -- SEÑAL DE LA OPERACIÓN QUE INDICA OPERACIÓN TERMINADA
     );
 END ENTITY OP_IDENTITY;
 
@@ -41,18 +41,18 @@ BEGIN
         ELSIF RISING_EDGE(CLK) THEN
             READY <= '0';
             CASE s_state IS
-                WHEN ST_IDLE =>
-                    IF START = '1' THEN
-                        s_idx   <= (OTHERS => '0');
-                        s_state <= ST_RUN;
+                WHEN ST_IDLE => -- ESTADO INICIAL
+                    IF START = '1' THEN -- NOS LLEGA LA SEÑAL DE COMIENZO DE OPERACIÓN
+                        s_idx   <= (OTHERS => '0');-- EL ÍNDICE SE PONE A 0
+                        s_state <= ST_RUN;-- PASAMOS AL ESTADO DE RUN/PLAY
                     END IF;
 
-                WHEN ST_RUN =>
+                WHEN ST_RUN => -- ESTADO DE RUN/PLAY
                     IF s_idx >= N_PARTS THEN
-                        READY   <= '1';
-                        s_state <= ST_IDLE;
+                        READY   <= '1';-- HEMOS TERMINADO
+                        s_state <= ST_IDLE;-- PASAMOS AL ESTADO INICIAL
                     ELSE
-                        s_idx <= s_idx + 1;
+                        s_idx <= s_idx + 1;-- INCREMENTAMOS EL ÍNDICE
                     END IF;
             END CASE;
         END IF;

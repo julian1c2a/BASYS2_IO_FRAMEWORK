@@ -42,7 +42,6 @@ BEGIN
         "1111" WHEN OTHERS;
 
     -- Pasamos el dato del array y encendemos el punto para el Display 3 y el Display 1
-    SEG <= HEXA_TO_7SEGS(DATOS_IN(TO_INTEGER(S_DISP_INDEX)), '1') WHEN (S_DISP_INDEX = "11" OR S_DISP_INDEX = "01") ELSE
-           HEXA_TO_7SEGS(DATOS_IN(TO_INTEGER(S_DISP_INDEX)), '0');
+    SEG <= HEXA_TO_7SEGS(DATOS_IN(TO_INTEGER(S_DISP_INDEX)), '0');
 
 END ARCHITECTURE RTL;

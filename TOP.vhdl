@@ -33,8 +33,8 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_state : fsm_state_t;
 
     -- Señales de Relojes y Ticks
-    SIGNAL s_clk_500, s_clk_500_d, s_tick_500 : STD_LOGIC;
-    SIGNAL s_clk_2,   s_clk_2_d,   s_tick_2   : STD_LOGIC;
+    SIGNAL s_clk_500, s_clk_500_d, s_tick_500 : STD_LOGIC;-- _d es de delay (retardo), señal retardada 1 ciclo
+    SIGNAL s_clk_2,   s_clk_2_d,   s_tick_2   : STD_LOGIC;-- _d es de delay (retardo), señal retardada 1 ciclo
 	 SIGNAL s_tick_btn : STD_LOGIC;
 
     -- Señales de Botones (Debouncing a 2 Hz)
@@ -54,8 +54,8 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Registros de Control
-    SIGNAL s_n_parts  : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7
-    SIGNAL s_byte_cnt : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7
+    SIGNAL s_n_parts  : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7 (from switches)
+    SIGNAL s_byte_cnt : UNSIGNED(2 DOWNTO 0);-- 3 bits allows us choose from 0 to 7 (from switches)
     
     -- Señales para el Display
     SIGNAL s_window       : STD_LOGIC_VECTOR(15 DOWNTO 0);-- Parte visible de la salida
@@ -85,7 +85,7 @@ BEGIN
             s_btn_sampled <= '0';
             s_btn_sampled_prev <= '0';
         ELSIF RISING_EDGE(CLK) THEN
-            -- Delays para generar ticks de 1 ciclo
+            -- Delays para generar ticks de 1 ciclo [generamos el retardo en las señales de reloj]
             s_clk_500_d <= s_clk_500;
             s_clk_2_d   <= s_clk_2;
             
@@ -107,8 +107,10 @@ BEGIN
     -- 2. MÁQUINA DE ESTADOS FINITOS (FSM)
     PROCESS(CLK, RST) IS
     BEGIN
-        IF RST = '1' THEN
-            s_state      <= ST_IDLE;
+        
+		  IF RST = '1' THEN
+        
+      		s_state      <= ST_IDLE;
             s_byte_cnt   <= (OTHERS => '0');
             s_n_parts    <= (OTHERS => '0');
             s_start      <= '0';
@@ -117,7 +119,8 @@ BEGIN
             s_out_mem_clr<= '0';
             s_in_mem_waddr <= (OTHERS => '0');
             s_in_mem_wdata <= (OTHERS => '0');
-        ELSIF RISING_EDGE(CLK) THEN
+        
+		  ELSIF RISING_EDGE(CLK) THEN
             
             s_start <= '0'; -- Por defecto a 0, se pulsa solo en S_OP
             s_in_mem_we   <= '0';
@@ -126,45 +129,47 @@ BEGIN
             
             CASE s_state IS
                 
-                WHEN ST_IDLE =>
+                WHEN ST_IDLE => -- ESTAMOS EN ESTADO INICIAL
                     LED(3 DOWNTO 0) <= "0001";
                     IF s_btn_valid = '1' THEN
-                        s_state    <= ST_IN;
-                        s_n_parts  <= UNSIGNED(SW(2 DOWNTO 0));
+                        s_state    <= ST_IN;-- PASAMOS AL ESTADO ENTRADA DE DATOS
+                        s_n_parts  <= UNSIGNED(SW(2 DOWNTO 0));-- NÚMERO DE BYTES DE ENTRADA
                         s_byte_cnt <= "000";
                         s_in_mem_clr  <= '1';
                         s_out_mem_clr <= '1';
                     END IF;
                     
-                WHEN ST_IN =>
+                WHEN ST_IN => -- ESTAMOS EN EL ESTADO ENTRADA DE DATOS
                     LED(3 DOWNTO 0) <= "0010";
                     IF s_btn_valid = '1' THEN
-                        s_in_mem_we    <= '1';
-                        s_in_mem_waddr <= RESIZE(s_byte_cnt, ABUS_t'LENGTH);
-                        s_in_mem_wdata <= UNSIGNED(SW);
+                        s_in_mem_we    <= '1';-- SEÑAL QUE PERMITE ESCRIBIR EN LA MEMORIA
+                        s_in_mem_waddr <= RESIZE(s_byte_cnt, ABUS_t'LENGTH);-- DIRECCIÓN DE ESCRITURA
+                        s_in_mem_wdata <= UNSIGNED(SW);-- DATO DE ENTRADA DE ESCRITURA DESDE SWITCHES
                         
                         IF s_byte_cnt >= s_n_parts THEN
-                            s_state <= ST_OP;
-                            s_start <= '1';
+                            s_state <= ST_OP;-- PASAMOS AL ESTADO DE OPERACIÓN
+                            s_start <= '1';-- ESTA SEÑAL ES PARA EL DISPOSITVO DE OPRERACIÓN
                         ELSE
-                            s_byte_cnt <= s_byte_cnt + 1;
+                            s_byte_cnt <= s_byte_cnt + 1;-- INCREMENTAMOS EL CONTADOR DE DIRECCIONES
                         END IF;
                     END IF;
                     
-                WHEN ST_OP =>
+                WHEN ST_OP => -- ESTAMOS EN EL ESTADO DE OPERACIÓN
                     LED(3 DOWNTO 0) <= "0100";
-                    IF s_ready = '1' THEN
-                        s_state <= ST_OUT;
+                    IF s_ready = '1' THEN -- SEÑAL DE 'TODO LISTO' QUE DA EL DISPOSITIVO DE OPERACIÓN
+                        s_state <= ST_OUT; -- PASAMOS AL ESTADO DE SALIDA DE DATO
                     END IF;
 						
-                WHEN ST_OUT =>
+                WHEN ST_OUT => -- ESTAMOS EN EL ESTADO DE SALIDA DE DATOS A DISPLAY
                     LED(3 DOWNTO 0) <= "1000";
                     IF s_btn_valid = '1' THEN
-                        s_state <= ST_IDLE;
+                        s_state <= ST_IDLE; -- VOLVEMOS AL ESTADO INICIAL
                     END IF;
                     
             END CASE;
+				
         END IF;
+		  
     END PROCESS;
     
     LED(7 DOWNTO 4) <= STD_LOGIC_VECTOR(s_byte_cnt) & '0'; -- Opcional: ver el progreso del contador
@@ -212,7 +217,7 @@ BEGIN
             RADDR0 => s_in_mem_raddr0,
             RDATA0 => s_in_mem_rdata0,
             RADDR1 => (OTHERS => '0'),
-            RDATA1 => s_in_mem_rdata1_nc
+            RDATA1 => s_in_mem_rdata1_nc -- NO CONECTADO
         );
 
     OUT_MEMORY_MODULE : ENTITY WORK.MEMORY

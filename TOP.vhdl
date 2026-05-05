@@ -47,10 +47,10 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_in_mem_clr,  s_in_mem_we  : STD_LOGIC;
     SIGNAL s_out_mem_clr, s_out_mem_we : STD_LOGIC;
 
-    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0,  s_in_mem_raddr1  : ABUS_t;
+    SIGNAL s_in_mem_waddr,  s_in_mem_raddr0  : ABUS_t;
     SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : ABUS_t;
 
-    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0,  s_in_mem_rdata1  : DBUS_t;
+    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0  : DBUS_t;
     SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Registros de Control
@@ -117,8 +117,6 @@ BEGIN
             s_out_mem_clr<= '0';
             s_in_mem_waddr <= (OTHERS => '0');
             s_in_mem_wdata <= (OTHERS => '0');
-            s_out_mem_raddr0 <= (OTHERS => '0');
-            s_out_mem_raddr1 <= (OTHERS => '0');
         ELSIF RISING_EDGE(CLK) THEN
             
             s_start <= '0'; -- Por defecto a 0, se pulsa solo en S_OP
@@ -203,8 +201,6 @@ BEGIN
 
 
     -- 4. INSTANCIACIÓN DE COMPONENTES DE I/O
-    s_in_mem_raddr1 <= (OTHERS => '0');
-
     IN_MEMORY_MODULE : ENTITY WORK.MEMORY
         PORT MAP (
             CLK    => CLK,
@@ -215,8 +211,8 @@ BEGIN
             WDATA  => s_in_mem_wdata,
             RADDR0 => s_in_mem_raddr0,
             RDATA0 => s_in_mem_rdata0,
-            RADDR1 => s_in_mem_raddr1,
-            RDATA1 => s_in_mem_rdata1
+            RADDR1 => (OTHERS => '0'),
+            RDATA1 => OPEN
         );
 
     OUT_MEMORY_MODULE : ENTITY WORK.MEMORY

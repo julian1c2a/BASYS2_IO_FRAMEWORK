@@ -13,7 +13,7 @@ USE GENERAL.MEMORY_TYPES.DBUS_t;
 USE GENERAL.MEMORY_TYPES.ABUS_t;
 
 LIBRARY UTILITIES;
-USE UTILITIES.UTILITIES.CONCAT;
+USE UTILITIES.UTILITIES.ALL;
 
 ENTITY TOP IS
     PORT (
@@ -32,13 +32,29 @@ ARCHITECTURE RTL OF TOP IS
     TYPE fsm_state_t IS (ST_IDLE, ST_IN, ST_OP, ST_OUT);
     SIGNAL s_state : fsm_state_t;
 
-    -- Señales de Relojes y Ticks
-    SIGNAL s_clk_500, s_clk_500_d, s_tick_500 : STD_LOGIC;-- _d es de delay (retardo), señal retardada 1 ciclo
-    SIGNAL s_clk_2,   s_clk_2_d,   s_tick_2   : STD_LOGIC;-- _d es de delay (retardo), señal retardada 1 ciclo
-	 SIGNAL s_tick_btn : STD_LOGIC;
+    -- Parámetros de ticks (sistema síncrono con reloj único)
+    CONSTANT C_IDX_500HZ : NATURAL := 0;
+    CONSTANT C_IDX_2HZ   : NATURAL := 1;
+    CONSTANT C_TICK_PERIODS : POSITIVE_VECTOR_t(0 TO 1) := (50000, 12500000);
+
+    CONSTANT C_BASE_CNT  : POSITIVE := GCD_ARRAY(C_TICK_PERIODS);
+    CONSTANT C_TICK_DIVS : POSITIVE_VECTOR_t(C_TICK_PERIODS'RANGE) := DIV_ARRAY(C_TICK_PERIODS, C_BASE_CNT);
+    CONSTANT C_MAX_DIV   : POSITIVE := MAX_IN_ARRAY(C_TICK_DIVS);
+
+    CONSTANT C_BASE_W    : POSITIVE := CLOG2(C_BASE_CNT);
+    CONSTANT C_DIV_W     : POSITIVE := CLOG2(C_MAX_DIV);
+
+    -- Señales de ticks
+    SIGNAL s_tick_500, s_tick_2 : STD_LOGIC;
+	 SIGNAL s_ticks : STD_LOGIC_VECTOR(C_TICK_PERIODS'RANGE);
+
+    -- Contadores del motor de ticks común
+    SIGNAL s_base_counter : UNSIGNED(C_BASE_W-1 DOWNTO 0);
+    TYPE tick_counter_array_t IS ARRAY (C_TICK_PERIODS'RANGE) OF UNSIGNED(C_DIV_W-1 DOWNTO 0);
+    SIGNAL s_tick_counters : tick_counter_array_t;
 
     -- Señales de Botones (Debouncing a 2 Hz)
-    SIGNAL s_btn_any, s_btn_sampled, s_btn_sampled_prev, s_btn_valid : STD_LOGIC;
+    SIGNAL s_btn_any, s_btn_sampled, s_btn_valid : STD_LOGIC;
 
     -- Señales de la Operación
     SIGNAL s_start, s_ready : STD_LOGIC;
@@ -63,45 +79,66 @@ ARCHITECTURE RTL OF TOP IS
 
 BEGIN
 
-    -- 1. GENERACIÓN DE RELOJES Y TICKS (Detección de flancos sobre 50MHz)
-    -- Generador 500 Hz para el Multiplexor de Displays
-    CLK_500_GEN : ENTITY WORK.GEN_IO_CLK
-        GENERIC MAP ( MAX_COUNT => 50000 )
-        PORT MAP ( RST => RST, CLK => CLK, IO_CLK => s_clk_500 );
-
-    -- Generador 2 Hz para el filtrado de UI (12,500,000 según las especificaciones)
-    CLK_2_GEN : ENTITY WORK.GEN_IO_CLK
-        GENERIC MAP ( MAX_COUNT => 12500000 )
-        PORT MAP ( RST => RST, CLK => CLK, IO_CLK => s_clk_2 );
+    -- 1. MOTOR DE TICKS SÍNCRONO CON BASE COMÚN (MCD)
 
     -- Cualquier botón de control sirve para avanzar (OR Lógico)
     s_btn_any <= BTN(0) OR BTN(1) OR BTN(2);
 
     PROCESS(CLK, RST) IS
+        VARIABLE v_tick_base : BOOLEAN;
+        VARIABLE v_tick_2_evt : BOOLEAN;
     BEGIN
         IF RST = '1' THEN
-            s_clk_500_d <= '0';
-            s_clk_2_d   <= '0';
+            s_base_counter <= (OTHERS => '0');
+            FOR I IN C_TICK_PERIODS'RANGE LOOP
+                s_tick_counters(I) <= (OTHERS => '0');
+                s_ticks(I) <= '0';
+            END LOOP;
             s_btn_sampled <= '0';
-            s_btn_sampled_prev <= '0';
+            s_btn_valid <= '0';
         ELSIF RISING_EDGE(CLK) THEN
-            -- Delays para generar ticks de 1 ciclo [generamos el retardo en las señales de reloj]
-            s_clk_500_d <= s_clk_500;
-            s_clk_2_d   <= s_clk_2;
-            
-            -- Debouncing sincronizado a la señal de 2Hz
-            IF (s_clk_2 = '1' AND s_clk_2_d = '0') THEN
-                s_btn_sampled_prev <= s_btn_sampled;
-					 s_btn_sampled <= s_btn_any;
+            v_tick_base := FALSE;
+            v_tick_2_evt := FALSE;
+
+            FOR I IN C_TICK_PERIODS'RANGE LOOP
+                s_ticks(I) <= '0';
+            END LOOP;
+            s_btn_valid <= '0';
+
+            -- Tick base cada C_BASE_CNT ciclos de reloj
+            IF s_base_counter = TO_UNSIGNED(C_BASE_CNT-1, C_BASE_W) THEN
+                s_base_counter <= (OTHERS => '0');
+                v_tick_base := TRUE;
+            ELSE
+                s_base_counter <= s_base_counter + 1;
+            END IF;
+
+            IF v_tick_base THEN
+                FOR I IN C_TICK_PERIODS'RANGE LOOP
+                    IF s_tick_counters(I) = TO_UNSIGNED(C_TICK_DIVS(I)-1, C_DIV_W) THEN
+                        s_tick_counters(I) <= (OTHERS => '0');
+                        s_ticks(I) <= '1';
+                        IF I = C_IDX_2HZ THEN
+                            v_tick_2_evt := TRUE;
+                        END IF;
+                    ELSE
+                        s_tick_counters(I) <= s_tick_counters(I) + 1;
+                    END IF;
+                END LOOP;
+            END IF;
+
+            IF v_tick_2_evt THEN
+                -- Debouncing por muestreo a 2Hz y detección de flanco ascendente
+                IF (s_btn_any = '1' AND s_btn_sampled = '0') THEN
+                    s_btn_valid <= '1';
+                END IF;
+                s_btn_sampled <= s_btn_any;
             END IF;
         END IF;
     END PROCESS;
 
-    s_tick_500  <= s_clk_500 AND NOT s_clk_500_d;
-    -- Detecta paso de 0 a 1 justo en el flanco activo del reloj de 2Hz
-	 s_tick_2 <= s_clk_2 AND NOT s_clk_2_d;
-	 s_tick_btn <= s_btn_sampled AND NOT s_btn_sampled_prev;
-    s_btn_valid <= '1' WHEN ((s_tick_btn AND s_tick_2) = '1') ELSE '0';
+    s_tick_500 <= s_ticks(C_IDX_500HZ);
+    s_tick_2   <= s_ticks(C_IDX_2HZ);
 
 
     -- 2. MÁQUINA DE ESTADOS FINITOS (FSM)

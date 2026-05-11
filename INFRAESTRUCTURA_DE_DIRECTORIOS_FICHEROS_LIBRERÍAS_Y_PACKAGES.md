@@ -58,14 +58,14 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 
 ### Qué declara
 
-- Constantes de parametrización:
-  - `C_DBUS_WIDTH = 8` — ancho del bus de datos en bits.
-  - `C_ABUS_WIDTH = 8` — ancho del bus de direcciones en bits.
+- Constantes de parametrización (actualizadas para la nueva arquitectura):
+  - `C_DBUS_WIDTH = 64` — ancho del bus de datos en bits (una palabra completa).
+  - `C_ABUS_WIDTH = 8` — ancho del bus de direcciones en bits (2^8 = 256 posiciones).
   - `C_DBUS_MSB = C_DBUS_WIDTH - 1`
   - `C_ABUS_MSB = C_ABUS_WIDTH - 1`
 - `SUBTYPE DBUS_t IS UNSIGNED(C_DBUS_MSB DOWNTO 0)` — tipo del bus de datos.
 - `SUBTYPE ABUS_t IS UNSIGNED(C_ABUS_MSB DOWNTO 0)` — tipo del bus de direcciones.
-- `TYPE MEMORY_T IS ARRAY(C_ABUS_MSB DOWNTO 0) OF DBUS_t` — array de 8 palabras de 8 bits.
+- `TYPE MEMORY_T IS ARRAY(2**C_ABUS_WIDTH-1 DOWNTO 0) OF DBUS_t` — array de 256 palabras de 64 bits.
 
 ### Dónde se usa
 
@@ -73,7 +73,7 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 - `OP_IDENTIDAD.vhdl`: puertos de interfaz con las memorias (`IN_RADDR`, `IN_RDATA`, `OUT_WADDR`, `OUT_WDATA`).
 - `TOP.vhdl`: todas las señales de interconexión entre módulos de memoria y operación.
 
-> Nota: la estructura representa memoria de 8 posiciones × 8 bits (según constantes actuales).
+> Nota: la estructura representa memoria de 256 posiciones × 64 bits (según constantes actuales).
 
 ---
 

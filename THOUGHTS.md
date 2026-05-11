@@ -1,0 +1,15 @@
+## IDEAS PARA IR FLEXIBILIZANDO LA ARQUITECTURA
+
+- El siguiente problema es ¿debemos tener un tipo `OP_CODE` para las instrucciones? Deberíamos tenerla en un package, de forma que en algún momento podamos cambiar una instrucción que no nos sirve para un programa por otra que sí, o simplemente añadir una nueva sin tener que tocar el código de la `FSM`.
+
+- En la versión actual del proyecto, el tipo `OP_CODE` se ha definido como un vector de 4 bits dentro de la entidad `TOP`, lo que limita su flexibilidad y dificulta su mantenimiento. Para mejorar esto, se propone mover la definición del tipo `OP_CODE` a un package VHDL dedicado, por ejemplo, `INSTRUCTION_TYPES.vhd`, dentro del directorio `GENERAL`. Este package podría contener la definición del tipo `OP_CODE` y las constantes que representan cada instrucción, lo que facilitaría su uso en la `FSM` y permitiría una mayor modularidad y escalabilidad del proyecto.
+
+- Habría que distinguir entre el `OP_CODE` de instrucción de la 'ALU', el `OP_CODE`  de instrucción de la `FSM`, el `OP_CODE` de instrucción de la `MEMORY` y lo más importante, el `OP_CODE` de instrucción de la `OP_SELECTOR` del `DATAPATH` en general (que debería incluir entre otras cosas, el `OP_CODE` de la `ALU`). Cada uno de estos tipos de `OP_CODE` podría tener su propia definición en el package, lo que permitiría una mayor claridad y organización del código.
+
+- Todo el punto anterior nos lleva a poder introducir instrucciones tipo `ASM` que deberíamos poder definir en el package, lo que nos permitiría una mayor flexibilidad y facilidad de mantenimiento del código.
+
+- Además, al tener los `OP_CODE` definidos en un package, podríamos reutilizar estos códigos en diferentes módulos del proyecto sin necesidad de duplicar definiciones, lo que mejora la consistencia y reduce el riesgo de errores.
+
+- Sobre la introducción de datos en memoria: el patrón de datos será el siguiente: `SW[7:0]` son 8 bits de datos que entran a la vez desde la placa. Como el dato de memoria es de 64 bits, los primeros `SW` que entren (en el tiempo) serán el byte LSB del dato en memoria. Para completar el dato en memoria, se irán introduciendo los siguientes bytes a través de `SW` en el orden que corresponda, es decir, el segundo byte que entre a través de `SW` será el siguiente byte del dato en memoria, y así sucesivamente hasta completar los 64 bits. De esta manera, se podrá cargar un dato completo en memoria utilizando los switches de la placa de manera secuencial.
+
+- Otro idea importante es que la memoria de 256x64 bits se pueda también cargar desde un archivo de texto o VHDL. De esta forma el manejo de `IO` tendría al menos dos modos: uno sería totalmente manual, dónde el usuario introduce los datos a través de los `SW` y otro modo sería semi-automático, dónde el usuario carga un archivo con los datos que se quieren introducir en memoria, y manipula la ejecución y la visusalización de datos.

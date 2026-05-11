@@ -247,7 +247,6 @@ BEGIN
                 WHEN MODE_RUN =>
                     LED(0) <= '1';
                     LED(1) <= '0';
-                    PC_DEBUG <= s_pc;
                     LED(7 DOWNTO 4) <= s_status_flags;
 
                     -- FSM del ciclo de instrucción (Fetch-Decode-Execute)

@@ -35,10 +35,10 @@ PACKAGE INSTRUCTION_SET IS
 
     FUNCTION pack_instr(
         opcode : STD_LOGIC_VECTOR(3 DOWNTO 0);
-        addr_a : ABUS_t := (OTHERS => '0');
-        addr_b : ABUS_t := (OTHERS => '0');
-        addr_d : ABUS_t := (OTHERS => '0');
-        imm    : UNSIGNED(7 DOWNTO 0) := (OTHERS => '0')
+        addr_a : ABUS_t := x"00";
+        addr_b : ABUS_t := x"00";
+        addr_d : ABUS_t := x"00";
+        imm    : UNSIGNED(7 DOWNTO 0) := x"00"
     ) RETURN DBUS_t;
 
 END PACKAGE INSTRUCTION_SET;
@@ -53,13 +53,16 @@ PACKAGE BODY INSTRUCTION_SET IS
 
     FUNCTION pack_instr(
         opcode : STD_LOGIC_VECTOR(3 DOWNTO 0);
-        addr_a : ABUS_t := (OTHERS => '0');
-        addr_b : ABUS_t := (OTHERS => '0');
-        addr_d : ABUS_t := (OTHERS => '0');
-        imm    : UNSIGNED(7 DOWNTO 0) := (OTHERS => '0')
+        addr_a : ABUS_t := x"00";
+        addr_b : ABUS_t := x"00";
+        addr_d : ABUS_t := x"00";
+        imm    : UNSIGNED(7 DOWNTO 0) := x"00"
     ) RETURN DBUS_t IS
+        -- Constante para el padding de 28 bits, para compatibilidad con ISE
+        CONSTANT C_PADDING : UNSIGNED(27 DOWNTO 0) := (OTHERS => '0');
     BEGIN
-        RETURN UNSIGNED(opcode) & addr_a & addr_b & addr_d & RESIZE(imm, 28) & (OTHERS => '0');
+        -- Formato: [63:60]Opcode, [59:52]AddrA, [51:44]AddrB, [43:36]AddrD, [35:28]Imm, [27:0]Ceros
+        RETURN UNSIGNED(opcode) & addr_a & addr_b & addr_d & imm & C_PADDING;
     END FUNCTION;
 
 END PACKAGE BODY INSTRUCTION_SET;

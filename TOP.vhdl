@@ -126,6 +126,12 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_status_flags : STD_LOGIC_VECTOR(3 DOWNTO 0); -- N, Z, C, V flags from OP_SELECTOR
     SIGNAL s_acc_debug : UNSIGNED(63 DOWNTO 0);
 
+    -- Señales intermedias para resolver conflictos de bus con OP_SELECTOR
+    SIGNAL s_op_in_raddr0, s_op_in_raddr1   : ABUS_t;
+    SIGNAL s_op_out_we                      : STD_LOGIC;
+    SIGNAL s_op_out_waddr                   : ABUS_t;
+    SIGNAL s_op_out_wdata                   : DBUS_t;
+
     -- Señales de memorias (entrada y salida separadas)
     -- La FSM ya no escribe en IN_MEMORY, se deshabilita la escritura.
     SIGNAL s_out_mem_we : STD_LOGIC;
@@ -156,7 +162,6 @@ BEGIN
             END LOOP;
             s_btn_mode_sampled  <= '0';
             s_btn_write_sampled <= '0';
-            s_status_flags     <= (OTHERS => '0');
         ELSIF RISING_EDGE(CLK) THEN
             v_tick_base := FALSE;
             v_tick_2_evt := FALSE;
@@ -225,7 +230,6 @@ BEGIN
             s_imm_reg    <= (OTHERS => '0');
         ELSIF RISING_EDGE(CLK) THEN
             s_start <= '0'; -- s_start es un pulso de un ciclo
-            s_out_mem_we <= '0'; -- La escritura en memoria también es un pulso
 
             -- Lógica para cambiar de modo de operación
             IF s_btn_mode_valid = '1' THEN
@@ -312,13 +316,6 @@ BEGIN
                     -- Los LEDs de estado de FSM se apagan.
                     LED(3 DOWNTO 2) <= "00";
 
-                    -- Lógica de escritura manual en memoria
-                    IF s_btn_write_valid = '1' THEN
-                        s_out_mem_we    <= '1';
-                        s_out_mem_waddr <= UNSIGNED(SW);
-                        s_out_mem_wdata <= s_acc_debug;
-                    END IF;
-
             END CASE;
         END IF;
     END PROCESS;
@@ -326,6 +323,7 @@ BEGIN
     -- 3. SISTEMA DE VISUALIZACIÓN DE MEMORIA (Activo en ambos modos)
     -- Los switches SW[7:0] seleccionan la dirección de memoria a visualizar.
     s_out_mem_raddr0 <= UNSIGNED(SW);
+    PC_DEBUG <= s_pc;
     -- Se muestran los 16 bits menos significativos de la palabra de 64 bits.
     s_window <= STD_LOGIC_VECTOR(s_out_mem_rdata0(15 DOWNTO 0));
     -- El segundo puerto de lectura de la memoria de salida no se usa.
@@ -338,6 +336,16 @@ BEGIN
     s_display_data(1) <= s_window(7 DOWNTO 4);
     s_display_data(2) <= s_window(11 DOWNTO 8);
     s_display_data(3) <= s_window(15 DOWNTO 12);
+
+    -- Lógica de arbitraje de buses (punto único de control para evitar multi-source)
+    -- Elige quién conduce el bus de direcciones de la memoria de entrada.
+    s_in_mem_raddr0 <= s_pc WHEN s_current_mode = MODE_RUN AND s_state = ST_FETCH ELSE s_op_in_raddr0;
+    s_in_mem_raddr1 <= s_op_in_raddr1; -- Solo OP_SELECTOR usa este puerto
+
+    -- Elige quién conduce el bus de escritura de la memoria de salida.
+    s_out_mem_we    <= s_btn_write_valid WHEN s_current_mode = MODE_MONITOR ELSE s_op_out_we;
+    s_out_mem_waddr <= UNSIGNED(SW)      WHEN s_current_mode = MODE_MONITOR ELSE s_op_out_waddr;
+    s_out_mem_wdata <= s_acc_debug       WHEN s_current_mode = MODE_MONITOR ELSE s_op_out_wdata;
 
 
     -- 4. INSTANCIACIÓN DE COMPONENTES DE I/O
@@ -383,13 +391,13 @@ BEGIN
             SRC_ADDR_A => s_addr_a_reg,
             SRC_ADDR_B => s_addr_b_reg,
             DST_ADDR   => s_addr_d_reg,
-            IN_RADDR0  => s_in_mem_raddr0,
+            IN_RADDR0  => s_op_in_raddr0,
             IN_RDATA0  => s_in_mem_rdata0,
-            IN_RADDR1  => s_in_mem_raddr1,
+            IN_RADDR1  => s_op_in_raddr1,
             IN_RDATA1  => s_in_mem_rdata1,
-            OUT_WE     => s_out_mem_we,
-            OUT_WADDR  => s_out_mem_waddr,
-            OUT_WDATA  => s_out_mem_wdata,
+            OUT_WE     => s_op_out_we,
+            OUT_WADDR  => s_op_out_waddr,
+            OUT_WDATA  => s_op_out_wdata,
             READY      => s_ready,
             ACC_DEBUG  => s_acc_debug, -- This is an internal signal
             STATUS_FLAGS_OUT => s_status_flags

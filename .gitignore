@@ -4,6 +4,18 @@
 # Permitir recorrer directorios
 !*/
 
+# Re-ignorar directorios específicos de herramientas y configuración.
+# Estas reglas anulan la '!*/' para las carpetas listadas,
+# asegurando que su contenido no sea rastreado por Git.
+_ngo/
+_xmsgs/
+.vscode/
+ipcore_dir/
+iseconfig/
+netgen/
+xlnx_auto_0_xdb/
+xst/
+
 # Mantener este archivo versionado
 !.gitignore
 !.gitattributes

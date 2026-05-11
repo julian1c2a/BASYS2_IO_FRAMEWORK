@@ -100,7 +100,7 @@ BEGIN
                         -- Assuming MODE is always "10" (verbal operation)
                         IF MODE = "10" THEN
                             CASE OP_CODE IS
-                                WHEN "0000" => -- JMP is a NOP for the datapath
+                                WHEN "0000" | "0100" | "0101" | "0110" | "0111" | "1011" | "1100" | "1101" | "1111" => -- All jumps are NOPs
                                     s_state <= ST_DONE;
                                 WHEN "0001" => -- LOAD_A
                                     s_verbal_op <= V_LOAD_A;

@@ -29,18 +29,27 @@ ARCHITECTURE RTL OF MEMORY IS
     FUNCTION init_sim_mem RETURN MEMORY_T IS
         VARIABLE v_mem : MEMORY_T := (OTHERS => (OTHERS => '0'));
     BEGIN
-        -- This program is loaded into IN_MEMORY when G_SIM_MODE is true
+        -- This program is loaded into IN_MEMORY when G_SIM_MODE is true to test all "jump if not" instructions
         IF G_SIM_MODE THEN
-            -- Program to test JZ and JMP
-            v_mem(0) := pack_instr(C_OP_CLR);                               -- ACC <= 0. This will set the Z flag.
-            v_mem(1) := pack_instr(C_OP_JZ, addr_a => x"10");               -- If Z is set, jump to address 0x10.
-            v_mem(2) := pack_instr(C_OP_ADD_IMM, imm => x"01");             -- This instruction should be skipped by the jump.
-            -- ... memory is zero until 0x10
-            v_mem(16) := pack_instr(C_OP_ADD_IMM, imm => x"05");            -- JZ lands here. ACC becomes 5.
-            v_mem(17) := pack_instr(C_OP_JMP, addr_a => x"20");             -- Unconditional jump to 0x20.
-            v_mem(18) := pack_instr(C_OP_ADD_IMM, imm => x"01");            -- This instruction should be skipped.
-            v_mem(32) := pack_instr(C_OP_ADD_IMM, imm => x"0A");            -- JMP lands here. ACC becomes 5 + 10 = 15.
-            v_mem(33) := pack_instr(C_OP_JMP, addr_a => x"21");             -- Infinite loop to halt simulation.
+            -- Program
+            v_mem(x"00") := pack_instr(C_OP_ADD_IMM, imm => x"01");             -- 1. Test JNZ: ACC=1, Z=0
+            v_mem(x"01") := pack_instr(C_OP_JNZ, addr_a => x"10");              -- Jump to phase 2
+            v_mem(x"02") := pack_instr(C_OP_JMP, addr_a => x"FE");             -- Should be skipped. JMP to error loop.
+
+            v_mem(x"10") := pack_instr(C_OP_CLR);                              -- 2. Test JNC: ACC=0, C=0
+            v_mem(x"11") := pack_instr(C_OP_JNC, addr_a => x"20");              -- Jump to phase 3
+            v_mem(x"12") := pack_instr(C_OP_JMP, addr_a => x"FE");             -- Should be skipped.
+
+            v_mem(x"20") := pack_instr(C_OP_CLR);                              -- 3. Test JNN: ACC=0, N=0
+            v_mem(x"21") := pack_instr(C_OP_JNN, addr_a => x"30");              -- Jump to phase 4
+            v_mem(x"22") := pack_instr(C_OP_JMP, addr_a => x"FE");             -- Should be skipped.
+
+            v_mem(x"30") := pack_instr(C_OP_CLR);                              -- 4. Test JNV: ACC=0, V=0
+            v_mem(x"31") := pack_instr(C_OP_JNV, addr_a => x"40");              -- Jump to success
+            v_mem(x"32") := pack_instr(C_OP_JMP, addr_a => x"FE");             -- Should be skipped.
+
+            v_mem(x"40") := pack_instr(C_OP_JMP, addr_a => x"40");              -- Success, infinite loop.
+            v_mem(x"FE") := pack_instr(C_OP_JMP, addr_a => x"FE");              -- Error, infinite loop.
         END IF;
         RETURN v_mem;
     END FUNCTION;

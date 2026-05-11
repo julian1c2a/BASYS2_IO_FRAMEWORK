@@ -52,10 +52,10 @@ BEGIN
                 v_carry    := NOT v_res_ext(64); -- Borrow is inverted carry
                 v_overflow := (ACC_IN(63) /= OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63));
                 v_result   := v_res_ext(63 DOWNTO 0);
-            WHEN "0100" => v_result := ACC_IN AND OP_A;        -- AND
-            WHEN "0101" => v_result := ACC_IN OR OP_A;         -- OR
-            WHEN "0110" => v_result := ACC_IN XOR OP_A;        -- XOR
-            WHEN "0111" => v_result := NOT ACC_IN;             -- NOT ACC
+            WHEN "0100" => v_result := ACC_IN;                 -- JNZ (NOP for ALU)
+            WHEN "0101" => v_result := ACC_IN;                 -- JNC (NOP for ALU)
+            WHEN "0110" => v_result := ACC_IN;                 -- JNN (NOP for ALU)
+            WHEN "0111" => v_result := ACC_IN;                 -- JNV (NOP for ALU)
             WHEN "1000" => v_result := SHIFT_LEFT(ACC_IN, 1);  -- SHL ACC
             WHEN "1001" => v_result := SHIFT_RIGHT(ACC_IN, 1); -- SHR ACC
             WHEN "1010" => -- ADD IMM
@@ -65,25 +65,9 @@ BEGIN
                 v_carry    := v_res_ext(64);
                 v_overflow := (ACC_IN(63) = S_IMM64(63)) AND (v_res_ext(63) /= ACC_IN(63));
                 v_result   := v_res_ext(63 DOWNTO 0);
-            WHEN "1011" => -- A + B
-                v_op1_ext  := '0' & OP_A;
-                v_op2_ext  := '0' & OP_B;
-                v_res_ext  := v_op1_ext + v_op2_ext;
-                v_carry    := v_res_ext(64);
-                v_overflow := (OP_A(63) = OP_B(63)) AND (v_res_ext(63) /= OP_A(63));
-                v_result   := v_res_ext(63 DOWNTO 0);
-            WHEN "1100" =>
-                IF OP_A >= OP_B THEN
-                    v_result := OP_A;
-                ELSE
-                    v_result := OP_B;
-                END IF;
-            WHEN "1101" =>
-                IF OP_A <= OP_B THEN
-                    v_result := OP_A;
-                ELSE
-                    v_result := OP_B;
-                END IF;
+            WHEN "1011" => v_result := ACC_IN;                 -- JV (NOP for ALU)
+            WHEN "1100" => v_result := ACC_IN;                 -- JC (NOP for ALU)
+            WHEN "1101" => v_result := ACC_IN;                 -- JN (NOP for ALU)
             WHEN "1110" => v_result := (OTHERS => '0');        -- CLEAR ACC
             WHEN OTHERS => v_result := ACC_IN;
         END CASE;

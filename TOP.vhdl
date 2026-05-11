@@ -254,7 +254,6 @@ BEGIN
                     CASE s_state IS
                         WHEN ST_FETCH =>
                             LED(3 DOWNTO 2) <= "01"; -- Fetching instruction
-                            s_in_mem_raddr0 <= s_pc;
                             s_state <= ST_DECODE_EXEC;
 
                         WHEN ST_DECODE_EXEC =>

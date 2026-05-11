@@ -30,6 +30,7 @@ BEGIN
         VARIABLE v_res_ext  : UNSIGNED(64 DOWNTO 0);
         VARIABLE v_carry    : STD_LOGIC;
         VARIABLE v_overflow : STD_LOGIC;
+        VARIABLE v_zero     : STD_LOGIC;
     BEGIN
         -- Default assignments for non-arithmetic operations
         v_carry    := '0';
@@ -43,14 +44,22 @@ BEGIN
                 v_op2_ext  := '0' & OP_A;
                 v_res_ext  := v_op1_ext + v_op2_ext;
                 v_carry    := v_res_ext(64);
-                v_overflow := (ACC_IN(63) = OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                IF (ACC_IN(63) = OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63)) THEN
+                    v_overflow := '1';
+                ELSE
+                    v_overflow := '0';
+                END IF;
                 v_result   := v_res_ext(63 DOWNTO 0);
             WHEN "0011" => -- ACC - A
                 v_op1_ext  := '0' & ACC_IN;
                 v_op2_ext  := '0' & OP_A;
                 v_res_ext  := v_op1_ext - v_op2_ext;
                 v_carry    := NOT v_res_ext(64); -- Borrow is inverted carry
-                v_overflow := (ACC_IN(63) /= OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                IF (ACC_IN(63) /= OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63)) THEN
+                    v_overflow := '1';
+                ELSE
+                    v_overflow := '0';
+                END IF;
                 v_result   := v_res_ext(63 DOWNTO 0);
             WHEN "0100" => v_result := ACC_IN;                 -- JNZ (NOP for ALU)
             WHEN "0101" => v_result := ACC_IN;                 -- JNC (NOP for ALU)
@@ -63,7 +72,11 @@ BEGIN
                 v_op2_ext  := '0' & S_IMM64;
                 v_res_ext  := v_op1_ext + v_op2_ext;
                 v_carry    := v_res_ext(64);
-                v_overflow := (ACC_IN(63) = S_IMM64(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                IF (ACC_IN(63) = S_IMM64(63)) AND (v_res_ext(63) /= ACC_IN(63)) THEN
+                    v_overflow := '1';
+                ELSE
+                    v_overflow := '0';
+                END IF;
                 v_result   := v_res_ext(63 DOWNTO 0);
             WHEN "1011" => v_result := ACC_IN;                 -- JV (NOP for ALU)
             WHEN "1100" => v_result := ACC_IN;                 -- JC (NOP for ALU)
@@ -72,10 +85,17 @@ BEGIN
             WHEN OTHERS => v_result := ACC_IN;
         END CASE;
 
+        -- Calculate Zero flag sequentially
+        IF v_result = (OTHERS => '0') THEN
+            v_zero := '1';
+        ELSE
+            v_zero := '0';
+        END IF;
+
         -- Asignación de salidas de flags y resultado
         RESULT <= v_result;
         FLAG_N <= v_result(63);
-        FLAG_Z <= '1' WHEN v_result = (OTHERS => '0') ELSE '0';
+        FLAG_Z <= v_zero;
         FLAG_C <= v_carry;
         FLAG_V <= v_overflow;
 

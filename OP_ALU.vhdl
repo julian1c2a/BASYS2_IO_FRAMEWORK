@@ -19,6 +19,7 @@ END ENTITY OP_ALU;
 
 ARCHITECTURE RTL OF OP_ALU IS
     SIGNAL S_IMM64 : UNSIGNED(63 DOWNTO 0);
+    CONSTANT C_ZERO_64 : UNSIGNED(63 DOWNTO 0) := (OTHERS => '0');
 BEGIN
 
     S_IMM64 <= RESIZE(IMM, 64);
@@ -86,7 +87,7 @@ BEGIN
         END CASE;
 
         -- Calculate Zero flag sequentially
-        IF v_result = (OTHERS => '0') THEN
+        IF v_result = C_ZERO_64 THEN
             v_zero := '1';
         ELSE
             v_zero := '0';

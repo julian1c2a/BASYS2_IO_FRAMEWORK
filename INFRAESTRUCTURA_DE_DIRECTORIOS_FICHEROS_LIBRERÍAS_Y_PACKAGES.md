@@ -137,7 +137,7 @@ El objetivo de este documento es servir como mapa técnico: qué carpetas import
 
 - `BASYS2_IO_FRAMEWORK.ucf`: mapeo de pines de la BASYS2.
 - `TOP.vhdl`: integración principal (FSM, entrada/salida, dos instancias de `MEMORY`, una de `OP_IDENTITY` y una de `DISPLAY_CTRL`).
-- `MEMORY.vhdl`: módulo de memoria RAM síncrona con 1 puerto de escritura y 2 de lectura asíncrona; puertos tipados con `ABUS_t`/`DBUS_t`.
+- `MEMORY.vhdl`: módulo de memoria RAM síncrona con 1 puerto de escritura y 1 de lectura asíncrona; puertos tipados con `ABUS_t`/`DBUS_t`.
 - `OP_IDENTIDAD.vhdl`: operación identidad — copia byte a byte de la memoria de entrada a la de salida mediante interfaz de dirección/dato; arquitectura separada en dos procesos síncronos (`P_CONTROL` y `P_MEM_IF`).
 - `GEN_IO_CLK.vhdl`: divisor/generador de reloj de E/S parametrizable.
 - `D7S_Drivers.vhdl`: controlador multiplexado de 4 displays 7-seg.

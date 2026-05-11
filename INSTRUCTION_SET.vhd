@@ -29,14 +29,12 @@ PACKAGE INSTRUCTION_SET IS
     -- Instruction packing/unpacking functions
     FUNCTION get_opcode(instr : DBUS_t) RETURN STD_LOGIC_VECTOR;
     FUNCTION get_addr_a(instr : DBUS_t) RETURN ABUS_t;
-    FUNCTION get_addr_b(instr : DBUS_t) RETURN ABUS_t;
     FUNCTION get_addr_d(instr : DBUS_t) RETURN ABUS_t;
     FUNCTION get_imm(instr : DBUS_t) RETURN DBUS_t;
 
     FUNCTION pack_instr(
         opcode : STD_LOGIC_VECTOR(3 DOWNTO 0);
         addr_a : ABUS_t := x"00";
-        addr_b : ABUS_t := x"00";
         addr_d : ABUS_t := x"00";
         imm    : UNSIGNED(7 DOWNTO 0) := x"00"
     ) RETURN DBUS_t;
@@ -47,22 +45,20 @@ PACKAGE BODY INSTRUCTION_SET IS
 
     FUNCTION get_opcode(instr : DBUS_t) RETURN STD_LOGIC_VECTOR IS BEGIN RETURN STD_LOGIC_VECTOR(instr(63 DOWNTO 60)); END FUNCTION;
     FUNCTION get_addr_a(instr : DBUS_t) RETURN ABUS_t IS BEGIN RETURN instr(59 DOWNTO 52); END FUNCTION;
-    FUNCTION get_addr_b(instr : DBUS_t) RETURN ABUS_t IS BEGIN RETURN instr(51 DOWNTO 44); END FUNCTION;
-    FUNCTION get_addr_d(instr : DBUS_t) RETURN ABUS_t IS BEGIN RETURN instr(43 DOWNTO 36); END FUNCTION;
-    FUNCTION get_imm(instr : DBUS_t) RETURN DBUS_t IS BEGIN RETURN RESIZE(instr(35 DOWNTO 28), DBUS_t'LENGTH); END FUNCTION;
+    FUNCTION get_addr_d(instr : DBUS_t) RETURN ABUS_t IS BEGIN RETURN instr(51 DOWNTO 44); END FUNCTION;
+    FUNCTION get_imm(instr : DBUS_t) RETURN DBUS_t IS BEGIN RETURN RESIZE(instr(43 DOWNTO 36), DBUS_t'LENGTH); END FUNCTION;
 
     FUNCTION pack_instr(
         opcode : STD_LOGIC_VECTOR(3 DOWNTO 0);
         addr_a : ABUS_t := x"00";
-        addr_b : ABUS_t := x"00";
         addr_d : ABUS_t := x"00";
         imm    : UNSIGNED(7 DOWNTO 0) := x"00"
     ) RETURN DBUS_t IS
-        -- Constante para el padding de 28 bits, para compatibilidad con ISE
-        CONSTANT C_PADDING : UNSIGNED(27 DOWNTO 0) := (OTHERS => '0');
+        -- Constante para el padding de 36 bits, para compatibilidad con ISE
+        CONSTANT C_PADDING : UNSIGNED(35 DOWNTO 0) := (OTHERS => '0');
     BEGIN
-        -- Formato: [63:60]Opcode, [59:52]AddrA, [51:44]AddrB, [43:36]AddrD, [35:28]Imm, [27:0]Ceros
-        RETURN UNSIGNED(opcode) & addr_a & addr_b & addr_d & imm & C_PADDING;
+        -- Formato: [63:60]Opcode, [59:52]AddrA, [51:44]AddrD, [43:36]Imm, [35:0]Ceros
+        RETURN UNSIGNED(opcode) & addr_a & addr_d & imm & C_PADDING;
     END FUNCTION;
 
 END PACKAGE BODY INSTRUCTION_SET;

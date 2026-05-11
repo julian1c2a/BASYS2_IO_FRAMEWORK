@@ -15,12 +15,9 @@ ENTITY OP_SELECTOR IS
         SIGNAL OP_CODE   : IN  STD_LOGIC_VECTOR(3 DOWNTO 0);
         SIGNAL IMM       : IN  DBUS_t;
         SIGNAL SRC_ADDR_A: IN  ABUS_t;
-        SIGNAL SRC_ADDR_B: IN  ABUS_t;
         SIGNAL DST_ADDR  : IN  ABUS_t;
         SIGNAL IN_RADDR0 : OUT ABUS_t;
         SIGNAL IN_RDATA0 : IN  DBUS_t;
-        SIGNAL IN_RADDR1 : OUT ABUS_t;
-        SIGNAL IN_RDATA1 : IN  DBUS_t;
         SIGNAL OUT_WE    : OUT STD_LOGIC;
         SIGNAL OUT_WADDR : OUT ABUS_t;
         SIGNAL OUT_WDATA : OUT DBUS_t;
@@ -48,7 +45,6 @@ ARCHITECTURE RTL OF OP_SELECTOR IS
     SIGNAL s_acc        : UNSIGNED(63 DOWNTO 0);
     SIGNAL s_status_reg : STD_LOGIC_VECTOR(3 DOWNTO 0); -- N, Z, C, V
     SIGNAL s_operand_a  : UNSIGNED(63 DOWNTO 0);
-    SIGNAL s_operand_b  : UNSIGNED(63 DOWNTO 0);
     SIGNAL s_alu_result : UNSIGNED(63 DOWNTO 0);
     SIGNAL s_flag_z     : STD_LOGIC;
     SIGNAL s_flag_n     : STD_LOGIC;
@@ -61,7 +57,6 @@ BEGIN
             OP_CODE => OP_CODE,
             ACC_IN  => s_acc,
             OP_A    => s_operand_a,
-            OP_B    => s_operand_b,
             IMM     => IMM(7 DOWNTO 0),
             RESULT  => s_alu_result,
             FLAG_Z  => s_flag_z,
@@ -82,9 +77,7 @@ BEGIN
             s_acc       <= (OTHERS => '0');
             s_status_reg<= (OTHERS => '0');
             s_operand_a <= (OTHERS => '0');
-            s_operand_b <= (OTHERS => '0');
             IN_RADDR0   <= (OTHERS => '0');
-            IN_RADDR1   <= (OTHERS => '0');
             OUT_WE      <= '0';
             OUT_WADDR   <= (OTHERS => '0');
             OUT_WDATA   <= (OTHERS => '0');
@@ -120,13 +113,11 @@ BEGIN
                 WHEN ST_FETCH_ADDR =>
                     -- Set addresses to read operands from IN_MEMORY
                     IN_RADDR0 <= SRC_ADDR_A;
-                    IN_RADDR1 <= SRC_ADDR_B;
                     s_state <= ST_LATCH_DATA;
 
                 WHEN ST_LATCH_DATA =>
                     -- Latch the data from memory. Data is valid in this cycle.
                     s_operand_a <= IN_RDATA0;
-                    s_operand_b <= IN_RDATA1;
                     s_state <= ST_EXECUTE;
 
                 WHEN ST_EXECUTE =>

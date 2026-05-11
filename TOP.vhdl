@@ -261,7 +261,6 @@ BEGIN
                             -- Desempaqueta la instrucción leída de memoria
                             s_opcode_reg <= get_opcode(s_in_mem_rdata0);
                             s_addr_a_reg <= get_addr_a(s_in_mem_rdata0);
-                            s_addr_b_reg <= get_addr_b(s_in_mem_rdata0);
                             s_addr_d_reg <= get_addr_d(s_in_mem_rdata0);
                             s_imm_reg    <= get_imm(s_in_mem_rdata0);
 
@@ -387,7 +386,6 @@ BEGIN
             OP_CODE    => s_opcode_reg,
             IMM        => s_imm_reg,
             SRC_ADDR_A => s_addr_a_reg,
-            SRC_ADDR_B => s_addr_b_reg,
             DST_ADDR   => s_addr_d_reg,
             IN_RADDR0  => s_op_in_raddr0,
             IN_RDATA0  => s_in_mem_rdata0,

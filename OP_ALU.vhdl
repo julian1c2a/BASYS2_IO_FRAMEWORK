@@ -9,7 +9,11 @@ ENTITY OP_ALU IS
         SIGNAL OP_A    : IN  UNSIGNED(63 DOWNTO 0);
         SIGNAL OP_B    : IN  UNSIGNED(63 DOWNTO 0);
         SIGNAL IMM     : IN  UNSIGNED(7 DOWNTO 0);
-        SIGNAL RESULT  : OUT UNSIGNED(63 DOWNTO 0)
+        SIGNAL RESULT  : OUT UNSIGNED(63 DOWNTO 0);
+        SIGNAL FLAG_Z  : OUT STD_LOGIC; -- Zero Flag
+        SIGNAL FLAG_N  : OUT STD_LOGIC; -- Negative Flag
+        SIGNAL FLAG_C  : OUT STD_LOGIC; -- Carry Flag
+        SIGNAL FLAG_V  : OUT STD_LOGIC  -- Overflow Flag
     );
 END ENTITY OP_ALU;
 
@@ -19,36 +23,78 @@ BEGIN
 
     S_IMM64 <= RESIZE(IMM, 64);
 
-    PROCESS(OP_CODE, ACC_IN, OP_A, OP_B, S_IMM64)
+    PROCESS(OP_CODE, ACC_IN, OP_A, OP_B, S_IMM64) IS
+        VARIABLE v_result   : UNSIGNED(63 DOWNTO 0);
+        VARIABLE v_op1_ext  : UNSIGNED(64 DOWNTO 0);
+        VARIABLE v_op2_ext  : UNSIGNED(64 DOWNTO 0);
+        VARIABLE v_res_ext  : UNSIGNED(64 DOWNTO 0);
+        VARIABLE v_carry    : STD_LOGIC;
+        VARIABLE v_overflow : STD_LOGIC;
     BEGIN
+        -- Default assignments for non-arithmetic operations
+        v_carry    := '0';
+        v_overflow := '0';
+
         CASE OP_CODE IS
-            WHEN "0000" => RESULT <= ACC_IN;                 -- NOP
-            WHEN "0001" => RESULT <= OP_A;                   -- LOAD A
-            WHEN "0010" => RESULT <= ACC_IN + OP_A;          -- ACC + A
-            WHEN "0011" => RESULT <= ACC_IN - OP_A;          -- ACC - A
-            WHEN "0100" => RESULT <= ACC_IN AND OP_A;        -- AND
-            WHEN "0101" => RESULT <= ACC_IN OR OP_A;         -- OR
-            WHEN "0110" => RESULT <= ACC_IN XOR OP_A;        -- XOR
-            WHEN "0111" => RESULT <= NOT ACC_IN;             -- NOT ACC
-            WHEN "1000" => RESULT <= SHIFT_LEFT(ACC_IN, 1);  -- SHL ACC
-            WHEN "1001" => RESULT <= SHIFT_RIGHT(ACC_IN, 1); -- SHR ACC
-            WHEN "1010" => RESULT <= ACC_IN + S_IMM64;       -- ADD IMM
-            WHEN "1011" => RESULT <= OP_A + OP_B;            -- A + B
+            WHEN "0000" => v_result := ACC_IN;                 -- NOP
+            WHEN "0001" => v_result := OP_A;                   -- LOAD A
+            WHEN "0010" => -- ACC + A
+                v_op1_ext  := '0' & ACC_IN;
+                v_op2_ext  := '0' & OP_A;
+                v_res_ext  := v_op1_ext + v_op2_ext;
+                v_carry    := v_res_ext(64);
+                v_overflow := (ACC_IN(63) = OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                v_result   := v_res_ext(63 DOWNTO 0);
+            WHEN "0011" => -- ACC - A
+                v_op1_ext  := '0' & ACC_IN;
+                v_op2_ext  := '0' & OP_A;
+                v_res_ext  := v_op1_ext - v_op2_ext;
+                v_carry    := NOT v_res_ext(64); -- Borrow is inverted carry
+                v_overflow := (ACC_IN(63) /= OP_A(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                v_result   := v_res_ext(63 DOWNTO 0);
+            WHEN "0100" => v_result := ACC_IN AND OP_A;        -- AND
+            WHEN "0101" => v_result := ACC_IN OR OP_A;         -- OR
+            WHEN "0110" => v_result := ACC_IN XOR OP_A;        -- XOR
+            WHEN "0111" => v_result := NOT ACC_IN;             -- NOT ACC
+            WHEN "1000" => v_result := SHIFT_LEFT(ACC_IN, 1);  -- SHL ACC
+            WHEN "1001" => v_result := SHIFT_RIGHT(ACC_IN, 1); -- SHR ACC
+            WHEN "1010" => -- ADD IMM
+                v_op1_ext  := '0' & ACC_IN;
+                v_op2_ext  := '0' & S_IMM64;
+                v_res_ext  := v_op1_ext + v_op2_ext;
+                v_carry    := v_res_ext(64);
+                v_overflow := (ACC_IN(63) = S_IMM64(63)) AND (v_res_ext(63) /= ACC_IN(63));
+                v_result   := v_res_ext(63 DOWNTO 0);
+            WHEN "1011" => -- A + B
+                v_op1_ext  := '0' & OP_A;
+                v_op2_ext  := '0' & OP_B;
+                v_res_ext  := v_op1_ext + v_op2_ext;
+                v_carry    := v_res_ext(64);
+                v_overflow := (OP_A(63) = OP_B(63)) AND (v_res_ext(63) /= OP_A(63));
+                v_result   := v_res_ext(63 DOWNTO 0);
             WHEN "1100" =>
                 IF OP_A >= OP_B THEN
-                    RESULT <= OP_A;
+                    v_result := OP_A;
                 ELSE
-                    RESULT <= OP_B;
+                    v_result := OP_B;
                 END IF;
             WHEN "1101" =>
                 IF OP_A <= OP_B THEN
-                    RESULT <= OP_A;
+                    v_result := OP_A;
                 ELSE
-                    RESULT <= OP_B;
+                    v_result := OP_B;
                 END IF;
-            WHEN "1110" => RESULT <= (OTHERS => '0');        -- CLEAR ACC
-            WHEN OTHERS => RESULT <= ACC_IN;
+            WHEN "1110" => v_result := (OTHERS => '0');        -- CLEAR ACC
+            WHEN OTHERS => v_result := ACC_IN;
         END CASE;
+
+        -- Asignación de salidas de flags y resultado
+        RESULT <= v_result;
+        FLAG_N <= v_result(63);
+        FLAG_Z <= '1' WHEN v_result = (OTHERS => '0') ELSE '0';
+        FLAG_C <= v_carry;
+        FLAG_V <= v_overflow;
+
     END PROCESS;
 
 END ARCHITECTURE RTL;

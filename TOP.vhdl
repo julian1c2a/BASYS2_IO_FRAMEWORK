@@ -127,20 +127,17 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_acc_debug : UNSIGNED(63 DOWNTO 0);
 
     -- Señales intermedias para resolver conflictos de bus con OP_SELECTOR
-    SIGNAL s_op_in_raddr0, s_op_in_raddr1   : ABUS_t;
+    SIGNAL s_op_in_raddr0                   : ABUS_t;
     SIGNAL s_op_out_we                      : STD_LOGIC;
     SIGNAL s_op_out_waddr                   : ABUS_t;
     SIGNAL s_op_out_wdata                   : DBUS_t;
 
     -- Señales de memorias (entrada y salida separadas)
-    -- La FSM ya no escribe en IN_MEMORY, se deshabilita la escritura.
-    SIGNAL s_out_mem_we : STD_LOGIC;
 
     SIGNAL s_in_mem_waddr,  s_in_mem_raddr0, s_in_mem_raddr1  : ABUS_t;
-    SIGNAL s_out_mem_waddr, s_out_mem_raddr0, s_out_mem_raddr1 : ABUS_t;
-
-    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0, s_in_mem_rdata1 : DBUS_t;
-    SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
+    SIGNAL s_out_mem_waddr, s_out_mem_raddr0 : ABUS_t;
+    SIGNAL s_in_mem_wdata,  s_in_mem_rdata0 : DBUS_t;
+    SIGNAL s_out_mem_wdata, s_out_mem_rdata0 : DBUS_t;
     
     -- Señales para el Display
     SIGNAL s_window       : STD_LOGIC_VECTOR(15 DOWNTO 0);-- Parte visible (16 bits LSB) de una palabra de 64 bits
@@ -324,8 +321,6 @@ BEGIN
     -- Se muestran los 16 bits menos significativos de la palabra de 64 bits.
     s_window <= STD_LOGIC_VECTOR(s_out_mem_rdata0(15 DOWNTO 0));
     -- El segundo puerto de lectura de la memoria de salida no se usa.
-    s_out_mem_raddr1 <= (OTHERS => '0');
-
     ACC_DEBUG_OUT <= s_acc_debug;
 
     -- Mapeo de la ventana a los displays (array de 4 nibbles)
@@ -338,7 +333,6 @@ BEGIN
     -- Elige quién conduce el bus de direcciones de la memoria de entrada.
     s_in_mem_raddr0 <= s_pc WHEN s_current_mode = MODE_RUN AND s_state = ST_FETCH ELSE s_op_in_raddr0;
     s_in_mem_raddr1 <= s_op_in_raddr1; -- Solo OP_SELECTOR usa este puerto
-
     -- Elige quién conduce el bus de escritura de la memoria de salida.
     s_out_mem_we    <= s_btn_write_valid WHEN s_current_mode = MODE_MONITOR ELSE s_op_out_we;
     s_out_mem_waddr <= UNSIGNED(SW)      WHEN s_current_mode = MODE_MONITOR ELSE s_op_out_waddr;
@@ -357,9 +351,7 @@ BEGIN
             WADDR  => (OTHERS => '0'),
             WDATA  => (OTHERS => '0'),
             RADDR0 => s_in_mem_raddr0,
-            RDATA0 => s_in_mem_rdata0,
-            RADDR1 => s_in_mem_raddr1,
-            RDATA1 => s_in_mem_rdata1
+            RDATA0 => s_in_mem_rdata0
         );
 
     OUT_MEMORY_MODULE : ENTITY WORK.MEMORY
@@ -371,8 +363,6 @@ BEGIN
             WDATA  => s_out_mem_wdata,
             RADDR0 => s_out_mem_raddr0,
             RDATA0 => s_out_mem_rdata0,
-            RADDR1 => s_out_mem_raddr1,
-            RDATA1 => s_out_mem_rdata1
         );
 
     OP_MODULE : ENTITY WORK.OP_SELECTOR
@@ -388,8 +378,6 @@ BEGIN
             IN_RADDR0  => s_op_in_raddr0,
             IN_RDATA0  => s_in_mem_rdata0,
             IN_RADDR1  => s_op_in_raddr1,
-            IN_RDATA1  => s_in_mem_rdata1,
-            OUT_WE     => s_op_out_we,
             OUT_WADDR  => s_op_out_waddr,
             OUT_WDATA  => s_op_out_wdata,
             READY      => s_ready,

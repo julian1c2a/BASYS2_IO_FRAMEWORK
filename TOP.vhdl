@@ -353,7 +353,6 @@ BEGIN
         PORT MAP (
             CLK    => CLK,
             RST    => RST,
-            CLR    => '0', -- El borrado de memoria se hace con RST global
             WE     => '0', -- La FSM ya no escribe en la memoria de entrada
             WADDR  => (OTHERS => '0'),
             WDATA  => (OTHERS => '0'),
@@ -367,7 +366,6 @@ BEGIN
         PORT MAP (
             CLK    => CLK,
             RST    => RST,
-            CLR    => '0', -- El borrado de memoria se hace con RST global
             WE     => s_out_mem_we,
             WADDR  => s_out_mem_waddr,
             WDATA  => s_out_mem_wdata,

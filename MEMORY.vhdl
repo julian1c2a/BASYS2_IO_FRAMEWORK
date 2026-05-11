@@ -13,7 +13,6 @@ ENTITY MEMORY IS
     PORT (
         SIGNAL CLK    : IN  STD_LOGIC;
         SIGNAL RST    : IN  STD_LOGIC;
-        SIGNAL CLR    : IN  STD_LOGIC;
         SIGNAL WE     : IN  STD_LOGIC;
         SIGNAL WADDR  : IN  ABUS_t;
         SIGNAL WDATA  : IN  DBUS_t;
@@ -60,9 +59,7 @@ BEGIN
         IF RST = '1' THEN
             S_MEM <= init_sim_mem; -- Re-initialize on reset during simulation
         ELSIF RISING_EDGE(CLK) THEN
-            IF CLR = '1' THEN
-                S_MEM <= (OTHERS => (OTHERS => '0'));
-            ELSIF WE = '1' THEN
+            IF WE = '1' THEN
                 S_MEM(TO_INTEGER(WADDR)) <= WDATA;
             END IF;
         END IF;

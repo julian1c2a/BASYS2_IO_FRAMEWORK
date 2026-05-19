@@ -137,6 +137,13 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_out_mem_wdata, s_out_mem_rdata0, s_out_mem_rdata1 : DBUS_t;
     
     -- Señales para el Display
+    -- Señales intermedias para la salida de OP_SELECTOR y evitar conflictos de drivers
+    SIGNAL s_op_in_raddr0, s_op_in_raddr1 : ABUS_t;
+    SIGNAL s_op_out_we    : STD_LOGIC;
+    SIGNAL s_op_out_waddr : ABUS_t;
+    SIGNAL s_op_out_wdata : DBUS_t;
+
+    -- Señales para el Display
     SIGNAL s_window       : STD_LOGIC_VECTOR(15 DOWNTO 0);-- Parte visible (16 bits LSB) de una palabra de 64 bits
     SIGNAL s_display_data : DATO_4DISP7SEGS_T; -- Los 7 segementos para cada uno de los ánodos
 
@@ -383,13 +390,13 @@ BEGIN
             SRC_ADDR_A => s_addr_a_reg,
             SRC_ADDR_B => s_addr_b_reg,
             DST_ADDR   => s_addr_d_reg,
-            IN_RADDR0  => s_in_mem_raddr0,
+            IN_RADDR0  => s_op_in_raddr0,
             IN_RDATA0  => s_in_mem_rdata0,
-            IN_RADDR1  => s_in_mem_raddr1,
+            IN_RADDR1  => s_op_in_raddr1,
             IN_RDATA1  => s_in_mem_rdata1,
-            OUT_WE     => s_out_mem_we,
-            OUT_WADDR  => s_out_mem_waddr,
-            OUT_WDATA  => s_out_mem_wdata,
+            OUT_WE     => s_op_out_we,
+            OUT_WADDR  => s_op_out_waddr,
+            OUT_WDATA  => s_op_out_wdata,
             READY      => s_ready,
             ACC_DEBUG  => s_acc_debug, -- This is an internal signal
             STATUS_FLAGS_OUT => s_status_flags

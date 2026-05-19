@@ -231,10 +231,8 @@ BEGIN
             s_addr_d_reg <= (OTHERS => '0');
             s_imm_reg    <= (OTHERS => '0');
         ELSIF RISING_EDGE(CLK) THEN
-            s_start <= '0'; -- s_start es un pulso de un ciclo
-            s_out_mem_we <= '0'; -- La escritura en memoria también es un pulso
-
             -- Lógica para cambiar de modo de operación
+            s_start <= '0'; -- s_start es un pulso de un ciclo
             IF s_btn_mode_valid = '1' THEN
                 IF s_current_mode = MODE_RUN THEN
                     s_current_mode <= MODE_MONITOR;
@@ -257,7 +255,6 @@ BEGIN
                     CASE s_state IS
                         WHEN ST_FETCH =>
                             LED(3 DOWNTO 2) <= "01"; -- Fetching instruction
-                            s_in_mem_raddr0 <= s_pc;
                             s_state <= ST_DECODE_EXEC;
 
                         WHEN ST_DECODE_EXEC =>
@@ -320,12 +317,7 @@ BEGIN
                     LED(3 DOWNTO 2) <= "00";
 
                     -- Lógica de escritura manual en memoria
-                    IF s_btn_write_valid = '1' THEN
-                        s_out_mem_we    <= '1';
-                        s_out_mem_waddr <= UNSIGNED(SW);
-                        s_out_mem_wdata <= s_acc_debug;
-                    END IF;
-
+                    -- La lógica de escritura se ha movido a una sección de arbitraje concurrente.
             END CASE;
         END IF;
     END PROCESS;
@@ -346,8 +338,29 @@ BEGIN
     s_display_data(2) <= s_window(11 DOWNTO 8);
     s_display_data(3) <= s_window(15 DOWNTO 12);
 
+    -- 4. ARBITRAJE DE BUSES DE MEMORIA Y CONEXIÓN DEL DATAPATH
 
-    -- 4. INSTANCIACIÓN DE COMPONENTES DE I/O
+    -- El puerto de lectura 0 de IN_MEMORY es compartido por la FSM (para fetch)
+    -- y el datapath (para leer operandos).
+    s_in_mem_raddr0 <= s_pc WHEN s_state = ST_FETCH ELSE s_op_in_raddr0;
+
+    -- El puerto de lectura 1 de IN_MEMORY es de uso exclusivo para el datapath.
+    s_in_mem_raddr1 <= s_op_in_raddr1;
+
+    -- El puerto de escritura de OUT_MEMORY es compartido por el datapath (para STORE)
+    -- y el usuario en modo monitor. Son mutuamente excluyentes.
+    s_out_mem_we <= s_op_out_we WHEN s_current_mode = MODE_RUN ELSE
+                    '1'         WHEN s_btn_write_valid = '1' ELSE -- Solo en MODE_MONITOR
+                    '0';
+
+    s_out_mem_waddr <= s_op_out_waddr WHEN s_current_mode = MODE_RUN ELSE
+                       UNSIGNED(SW); -- Dirección para escritura manual en MODE_MONITOR
+
+    s_out_mem_wdata <= s_op_out_wdata WHEN s_current_mode = MODE_RUN ELSE
+                       s_acc_debug;    -- Dato para escritura manual en MODE_MONITOR
+
+
+    -- 5. INSTANCIACIÓN DE COMPONENTES DE I/O
     IN_MEMORY_MODULE : ENTITY WORK.MEMORY
         GENERIC MAP (
             G_SIM_MODE => G_SIM_MODE
@@ -397,184 +410,6 @@ BEGIN
             OUT_WE     => s_op_out_we,
             OUT_WADDR  => s_op_out_waddr,
             OUT_WDATA  => s_op_out_wdata,
-            READY      => s_ready,
-            ACC_DEBUG  => s_acc_debug, -- This is an internal signal
-            STATUS_FLAGS_OUT => s_status_flags
-        );
-
-    DISPLAY_MODULE : ENTITY D7S.DISPLAY_CTRL
-        PORT MAP (
-            CLK        => CLK,
-            RST        => RST,
-            TICK_500HZ => s_tick_500,
-            DATOS_IN   => s_display_data,
-            AN         => AN,
-            SEG        => SEG
-        );
-
-END ARCHITECTURE RTL;
-            LED(7 DOWNTO 4) <= s_status_flags;
-            PC_DEBUG <= s_pc;
-            
-            CASE s_state IS
-                WHEN ST_FETCH =>
-                    LED(3 DOWNTO 0) <= "0001"; -- Fetching instruction
-                    s_in_mem_raddr0 <= s_pc;
-                    s_state <= ST_DECODE_EXEC;
-
-                WHEN ST_DECODE_EXEC =>
-                    LED(3 DOWNTO 0) <= "0010"; -- Decoding and executing
-                    
-                    -- Unpack instruction from memory data
-                    s_opcode_reg <= get_opcode(s_in_mem_rdata0);
-                    s_addr_a_reg <= get_addr_a(s_in_mem_rdata0);
-                    s_addr_b_reg <= get_addr_b(s_in_mem_rdata0);
-                    s_addr_d_reg <= get_addr_d(s_in_mem_rdata0);
-                    s_imm_reg    <= get_imm(s_in_mem_rdata0);
-
-                    -- Check for control flow instructions (handled by TOP)
-                    IF get_opcode(s_in_mem_rdata0) = C_OP_JMP THEN
-                        s_pc <= get_addr_a(s_in_mem_rdata0); -- Unconditional jump
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JZ THEN -- Jump if Zero
-                        IF s_status_flags(2) = '1' THEN -- Check Z flag (bit 2 of NZCV)
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JN THEN -- Jump if Negative
-                        IF s_status_flags(3) = '1' THEN -- Check N flag (bit 3 of NZCV)
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JC THEN -- Jump if Carry
-                        IF s_status_flags(1) = '1' THEN -- Check C flag (bit 1 of NZCV)
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JV THEN -- Jump if Overflow
-                        IF s_status_flags(0) = '1' THEN -- Check V flag (bit 0 of NZCV)
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JNZ THEN -- Jump if Not Zero
-                        IF s_status_flags(2) = '0' THEN -- Check Z flag
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JNN THEN -- Jump if Not Negative
-                        IF s_status_flags(3) = '0' THEN -- Check N flag
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JNC THEN -- Jump if Not Carry
-                        IF s_status_flags(1) = '0' THEN -- Check C flag
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSIF get_opcode(s_in_mem_rdata0) = C_OP_JNV THEN -- Jump if Not Overflow
-                        IF s_status_flags(0) = '0' THEN -- Check V flag
-                            s_pc <= get_addr_a(s_in_mem_rdata0); -- Jump taken
-                        ELSE
-                            s_pc <= s_pc + 1; -- Jump not taken
-                        END IF;
-                        s_state <= ST_FETCH;
-                    ELSE
-                        -- It's a datapath instruction, send it to OP_SELECTOR
-                        s_start <= '1';
-                        s_state <= ST_WAIT_READY;
-                    END IF;
-
-                WHEN ST_WAIT_READY =>
-                    LED(3 DOWNTO 0) <= "0100"; -- Waiting for datapath
-                    IF s_ready = '1' THEN
-                        s_pc <= s_pc + 1;
-                        s_state <= ST_FETCH;
-                    END IF;
-            END CASE;
-        END IF;
-    END PROCESS;
-
-    -- 3. SISTEMA DE VISUALIZACIÓN DE MEMORIA
-    -- Los switches SW[7:0] seleccionan la dirección de memoria a visualizar.
-    s_out_mem_raddr0 <= UNSIGNED(SW);
-    -- Se muestran los 16 bits menos significativos de la palabra de 64 bits.
-    s_window <= STD_LOGIC_VECTOR(s_out_mem_rdata0(15 DOWNTO 0));
-    -- El segundo puerto de lectura de la memoria de salida no se usa.
-    s_out_mem_raddr1 <= (OTHERS => '0');
-
-    ACC_DEBUG_OUT <= s_acc_debug;
-
-    -- Mapeo de la ventana a los displays (array de 4 nibbles)
-    s_display_data(0) <= s_window(3 DOWNTO 0);
-    s_display_data(1) <= s_window(7 DOWNTO 4);
-    s_display_data(2) <= s_window(11 DOWNTO 8);
-    s_display_data(3) <= s_window(15 DOWNTO 12);
-
-
-    -- 4. INSTANCIACIÓN DE COMPONENTES DE I/O
-    IN_MEMORY_MODULE : ENTITY WORK.MEMORY
-        GENERIC MAP (
-            G_SIM_MODE => G_SIM_MODE
-        )
-        PORT MAP (
-            CLK    => CLK,
-            RST    => RST,
-            CLR    => '0', -- El borrado de memoria se hace con RST global
-            WE     => '0', -- La FSM ya no escribe en la memoria de entrada
-            WADDR  => (OTHERS => '0'),
-            WDATA  => (OTHERS => '0'),
-            RADDR0 => s_in_mem_raddr0,
-            RDATA0 => s_in_mem_rdata0,
-            RADDR1 => s_in_mem_raddr1,
-            RDATA1 => s_in_mem_rdata1
-        );
-
-    OUT_MEMORY_MODULE : ENTITY WORK.MEMORY
-        PORT MAP (
-            CLK    => CLK,
-            RST    => RST,
-            CLR    => '0', -- El borrado de memoria se hace con RST global
-            WE     => s_out_mem_we,
-            WADDR  => s_out_mem_waddr,
-            WDATA  => s_out_mem_wdata,
-            RADDR0 => s_out_mem_raddr0,
-            RDATA0 => s_out_mem_rdata0,
-            RADDR1 => s_out_mem_raddr1,
-            RDATA1 => s_out_mem_rdata1
-        );
-
-    OP_MODULE : ENTITY WORK.OP_SELECTOR
-        PORT MAP (
-            CLK        => CLK,
-            RST        => RST,
-            START      => s_start,
-            MODE       => "10", -- Modo verbal, el único implementado
-            OP_CODE    => s_opcode_reg,
-            IMM        => s_imm_reg,
-            SRC_ADDR_A => s_addr_a_reg,
-            SRC_ADDR_B => s_addr_b_reg,
-            DST_ADDR   => s_addr_d_reg,
-            IN_RADDR0  => s_in_mem_raddr0,
-            IN_RDATA0  => s_in_mem_rdata0,
-            IN_RADDR1  => s_in_mem_raddr1,
-            IN_RDATA1  => s_in_mem_rdata1,
-            OUT_WE     => s_out_mem_we,
-            OUT_WADDR  => s_out_mem_waddr,
-            OUT_WDATA  => s_out_mem_wdata,
             READY      => s_ready,
             ACC_DEBUG  => s_acc_debug, -- This is an internal signal
             STATUS_FLAGS_OUT => s_status_flags

@@ -59,7 +59,7 @@ PACKAGE BODY INSTRUCTION_SET IS
         imm    : UNSIGNED(7 DOWNTO 0) := (OTHERS => '0')
     ) RETURN DBUS_t IS
     BEGIN
-        RETURN UNSIGNED(opcode) & addr_a & addr_b & addr_d & RESIZE(imm, 28) & (OTHERS => '0');
+        RETURN UNSIGNED(opcode) & addr_a & addr_b & addr_d & RESIZE(imm, 28) & TO_UNSIGNED(0, 8);
     END FUNCTION;
 
 END PACKAGE BODY INSTRUCTION_SET;

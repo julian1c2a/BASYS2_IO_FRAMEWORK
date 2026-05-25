@@ -86,7 +86,7 @@ BEGIN
         END CASE;
 
         -- Calculate Zero flag sequentially
-        IF v_result = (OTHERS => '0') THEN
+        IF v_result = 0 THEN
             v_zero := '1';
         ELSE
             v_zero := '0';

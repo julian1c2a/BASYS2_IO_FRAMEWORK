@@ -147,6 +147,11 @@ ARCHITECTURE RTL OF TOP IS
     SIGNAL s_window       : STD_LOGIC_VECTOR(15 DOWNTO 0);-- Parte visible (16 bits LSB) de una palabra de 64 bits
     SIGNAL s_display_data : DATO_4DISP7SEGS_T; -- Los 7 segementos para cada uno de los ánodos
 
+    -- Constantes auxiliares para compatibilidad con ISE 14.7 (VHDL-93):
+    -- ISE no acepta (OTHERS => '0') como actual en port map para tipos UNSIGNED.
+    CONSTANT C_ZERO_ADDR : ABUS_t := (OTHERS => '0');
+    CONSTANT C_ZERO_DATA : DBUS_t := (OTHERS => '0');
+
 BEGIN
 
     -- 1. MOTOR DE TICKS SÍNCRONO CON BASE COMÚN (MCD)
@@ -370,8 +375,8 @@ BEGIN
             RST    => RST,
             CLR    => '0', -- El borrado de memoria se hace con RST global
             WE     => '0', -- La FSM ya no escribe en la memoria de entrada
-            WADDR  => (OTHERS => '0'),
-            WDATA  => (OTHERS => '0'),
+            WADDR  => C_ZERO_ADDR,
+            WDATA  => C_ZERO_DATA,
             RADDR0 => s_in_mem_raddr0,
             RDATA0 => s_in_mem_rdata0,
             RADDR1 => s_in_mem_raddr1,
